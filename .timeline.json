@@ -1,11 +1,11 @@
 {
-  "timeline_index": 37,
+  "timeline_index": 46,
   "planner": {
     "Team Leader": {
       "1": {
         "task_id": "1",
         "dependent_task_ids": [],
-        "instruction": "按照\"方案A: Mike作为唯一入口\"增量更新架构设计文档和UML图。\n\n**核心改动：**\n\n1. **重新定位Mike的角色**\n   - Mike是团队的唯一决策者和协调者\n   - 所有用户消息先到Mike，由Mike决定是否需要其他Agent\n   - Mike负责任务分配、进度监控、质量把关、异常处理\n   - 其他Agent（Emma/Bob/Alex/David/Iris）是Mike的执行团队\n\n2. **Agent Manager角色调整**\n   - 从\"决策者\"降级为\"技术支撑层\"\n   - 主要职责：管理Agent实例、提供消息路由、维护会话状态\n   - 不再直接决策任务分配，而是执行Mike的指令\n\n3. **消息流调整**\n   ```\n   优化前：用户 → Agent Manager → 各Agent（平级）\n   优化后：用户 → Mike → 其他Agent → Mike → 用户\n   ```\n\n**需要更新的文件：**\n\n1. `/workspace/docs/design/system_design.md`\n   - 第3.2节\"Agent编排层\"：重写Mike的核心职责\n   - 删除第9节\"后续迭代计划\"\n   - 删除第10节\"总结\"中的\"技术亮点\"部分\n   - 保持简洁，只描述核心架构\n\n2. `/workspace/docs/design/architect.plantuml`\n   - 调整层级关系，Mike在Agent Pool上方\n   - Agent Manager连接到Mike，而不是直接连接其他Agent\n   - 添加注释说明Mike的决策者角色\n\n3. `/workspace/docs/design/sequence_diagram.plantuml`\n   - 修改消息流：所有决策经过Mike\n   - 示例流程：用户 → Mike分析 → Mike分配Emma → Emma完成通知Mike → Mike决定下一步 → Mike分配Bob → ...\n\n4. `/workspace/docs/design/class_diagram.plantuml`\n   - 扩展MikeAgent类，增加决策方法：\n     - analyze_requirement()\n     - assign_task_to_agent()\n     - review_deliverable()\n     - handle_agent_completion()\n   - 调整AgentManager类，体现其为Mike服务的角色\n\n**输出要求：**\n- 增量更新，不要重新生成整个文件\n- 保持简洁实用，删除冗余内容\n- 重点突出Mike作为Team Leader的核心作用\n- 确保架构描述清晰，符合真实团队的最佳实践\n\n**参考实现：**\n```python\nclass MikeAgent(BaseAgent):\n    def process_message(self, message):\n        # 1. 分析需求复杂度\n        analysis = self.analyze_requirement(message)\n        \n        # 2. 决定执行策略\n        if analysis.complexity == \"simple\":\n            self.assign_task(AlexAgent, task)\n        elif analysis.needs_research:\n            self.assign_task(EmmaAgent, research_task)\n        \n        # 3. 监控和质量把关\n        self.monitor_progress()\n    \n    def on_agent_completed(self, agent, result):\n        # Agent完成后，Mike决定下一步\n        next_action = self.decide_next_step(result)\n        if next_action:\n            self.assign_task(next_agent, next_task)\n```",
+        "instruction": "按照以下三个核心优化点增量更新架构设计文档和UML图：\n\n**核心优化点：**\n\n1. **移除 Agent Manager**\n   - 从架构中完全移除 Agent Manager 组件\n   - Mike 直接管理和持有其他 Agent 的引用\n   - 基础服务（LLM Service、Tool Executor）通过依赖注入提供给 BaseAgent\n   - 更新所有相关的架构描述和图表\n\n2. **Task Scheduler 与所有 Agent 双向关联**\n   - Task Scheduler 不只连接 Mike，而是连接所有 Agent（Emma、Bob、Alex、David、Iris）\n   - 双向关联：\n     - Task Scheduler → Agent：分配就绪任务\n     - Agent → Task Scheduler：通知任务完成，触发依赖检查\n   - Mike 通过 Task Scheduler 协调任务流转\n\n3. **Message Router 连接到所有 Agent**\n   - Message Router 连接所有 Agent（不只是 Mike）\n   - 所有 Agent 都可以通过 Message Router 发送状态消息到 WebSocket\n   - 支持 Agent 间的点对点通信和广播\n\n**需要更新的文件：**\n\n**1. `/workspace/docs/design/system_design.md`**\n   - 删除 Agent Manager 的所有描述\n   - 更新\"Agent编排层\"章节：\n     - 说明 Mike 直接管理团队成员\n     - 说明 Task Scheduler 与所有 Agent 的双向关联\n     - 说明 Message Router 连接所有 Agent\n   - 更新\"程序调用流程\"章节，移除 Agent Manager 相关步骤\n   - 保持简洁明了\n\n**2. `/workspace/docs/design/architect.plantuml`**\n   - 删除 Agent Manager 组件\n   - 调整连接关系：\n     - Task Scheduler 连接到所有 Agent（双向箭头）\n     - Message Router 连接到所有 Agent\n     - Mike 直接连接到其他 Agent（管理关系）\n   - 添加注释说明关键关联关系\n\n**3. `/workspace/docs/design/sequence_diagram.plantuml`**\n   - 移除所有 Agent Manager 相关的交互\n   - 更新流程：\n     - 用户 → Mike\n     - Mike → Task Scheduler（创建任务）\n     - Task Scheduler → Agent（分配任务）\n     - Agent → Task Scheduler（完成通知）\n     - Task Scheduler → Mike（进度报告）\n   - 展示 Agent 通过 Message Router 发送状态到 WebSocket\n\n**4. `/workspace/docs/design/class_diagram.plantuml`**\n   - 删除 AgentManager 类\n   - 更新 MikeAgent 类：\n     - 添加 team_members: Dict[str, BaseAgent]\n     - 添加 task_scheduler: TaskScheduler\n   - 更新 TaskScheduler 类：\n     - 添加与所有 Agent 的关联关系\n     - 添加 notify_agent(agent: BaseAgent, task: Task)\n     - 添加 on_task_completed(task_id: str, agent: str)\n   - 更新 MessageRouter 类：\n     - 明确连接到所有 Agent\n     - 添加 route_to_agent(agent_name: str, message: Message)\n\n**实现参考：**\n\n```python\n# 优化后的 Mike Agent\nclass MikeAgent(BaseAgent):\n    def __init__(self, llm_service, tool_executor, message_router):\n        super().__init__(llm_service, tool_executor, message_router)\n        # Mike 直接持有团队成员\n        self.team_members = {\n            \"Emma\": EmmaAgent(llm_service, tool_executor, message_router),\n            \"Bob\": BobAgent(llm_service, tool_executor, message_router),\n            \"Alex\": AlexAgent(llm_service, tool_executor, message_router),\n        }\n        # Mike 持有 Task Scheduler\n        self.task_scheduler = TaskScheduler(message_router)\n        # 注册所有 Agent 到 Task Scheduler\n        for agent in self.team_members.values():\n            self.task_scheduler.register_agent(agent)\n    \n    def process_user_message(self, message):\n        # 分析需求，创建任务\n        task_plan = self.create_task_plan(message)\n        # 提交任务到 Task Scheduler\n        for task in task_plan.tasks:\n            self.task_scheduler.schedule_task(task)\n\n# Task Scheduler 与所有 Agent 关联\nclass TaskScheduler:\n    def __init__(self, message_router):\n        self.message_router = message_router\n        self.agents = {}  # 所有注册的 Agent\n        self.task_queue = []\n    \n    def register_agent(self, agent: BaseAgent):\n        self.agents[agent.name] = agent\n    \n    def assign_task_to_agent(self, task: Task):\n        agent = self.agents[task.assignee]\n        agent.execute_task(task)\n    \n    def on_task_completed(self, task_id: str, agent_name: str):\n        # Agent 完成任务后调用\n        self.mark_completed(task_id)\n        self.check_dependent_tasks(task_id)\n        # 分配下一个就绪任务\n        next_task = self.get_next_ready_task()\n        if next_task:\n            self.assign_task_to_agent(next_task)\n\n# 每个 Agent 都连接到 Message Router 和 Task Scheduler\nclass EmmaAgent(BaseAgent):\n    def execute_task(self, task):\n        # 发送状态到 Message Router\n        self.message_router.send_to_websocket(\n            message=AgentMessage(agent=\"Emma\", status=\"working\")\n        )\n        # 执行任务...\n        result = self.do_work(task)\n        # 通知 Task Scheduler 完成\n        self.task_scheduler.on_task_completed(task.task_id, \"Emma\")\n        # 发送完成消息\n        self.message_router.send_to_websocket(\n            message=AgentMessage(agent=\"Emma\", status=\"completed\")\n        )\n```\n\n**输出要求：**\n- 增量更新，不重新生成整个文件\n- 保持简洁明了，清楚表明整个架构\n- 重点突出三个优化点\n- 确保架构图和文档描述一致\n\n请开始更新这些文件。",
         "task_type": "general",
         "code": "",
         "result": "",
@@ -13,7 +13,7 @@
         "is_finished": true,
         "assignee": "Bob",
         "start_at": 1762518018.7559595,
-        "end_at": 1762518375.1776032
+        "end_at": 1762519479.6446912
       },
       "current_task_id": "1",
       "2": {
@@ -84,7 +84,16 @@
     "34": 1,
     "35": 1,
     "36": 1,
-    "37": 1
+    "37": 1,
+    "38": 1,
+    "39": 1,
+    "40": 1,
+    "41": 1,
+    "42": 1,
+    "43": 1,
+    "44": 1,
+    "45": 1,
+    "46": 1
   },
   "preview_servers": {},
   "preview_server": null,

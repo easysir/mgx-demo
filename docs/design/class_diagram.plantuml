@@ -3,22 +3,25 @@
 ' Core Agent System
 abstract class BaseAgent {
     +agent_id: str
+    +agent_name: str
     +role: str
     +capabilities: List[str]
-    +llm_config: LLMConfig
-    +tools: List[Tool]
+    +llm_service: LLMService
+    +tool_executor: ToolExecutor
+    +message_router: MessageRouter
     +memory: AgentMemory
     --
     +{abstract} process_message(message: Message): Response
     +execute_tool(tool_name: str, params: Dict): ToolResult
     +think(context: Context): Thought
     +act(action: Action): ActionResult
+    +send_message(receiver: str, content: str): None
+    +notify_task_completed(task_id: str): None
 }
 
 class MikeAgent extends BaseAgent {
     +team_members: Dict[str, BaseAgent]
-    +current_task_plan: TaskPlan
-    +decision_history: List[Decision]
+    +task_scheduler: TaskScheduler
     --
     +analyze_requirement(message: str): RequirementAnalysis
     +create_task_plan(analysis: RequirementAnalysis): TaskPlan
@@ -36,7 +39,7 @@ class EmmaAgent extends BaseAgent {
     +analyze_requirements(input: str): PRD
     +conduct_research(topic: str): ResearchReport
     +create_prd(requirements: Dict): PRD
-    +report_to_mike(result: Any): None
+    +execute_task(task: Task): TaskResult
 }
 
 class BobAgent extends BaseAgent {
@@ -45,7 +48,7 @@ class BobAgent extends BaseAgent {
     +design_architecture(prd: PRD): Architecture
     +create_diagrams(design: Design): List[Diagram]
     +review_design(code: str): DesignReview
-    +report_to_mike(result: Any): None
+    +execute_task(task: Task): TaskResult
 }
 
 class AlexAgent extends BaseAgent {
@@ -55,7 +58,7 @@ class AlexAgent extends BaseAgent {
     +write_code(spec: Specification): Code
     +test_code(code: Code): TestResult
     +deploy_application(app: Application): DeploymentResult
-    +report_to_mike(result: Any): None
+    +execute_task(task: Task): TaskResult
 }
 
 class DavidAgent extends BaseAgent {
@@ -64,7 +67,7 @@ class DavidAgent extends BaseAgent {
     +analyze_data(data: DataFrame): Analysis
     +create_visualization(data: DataFrame): Visualization
     +generate_insights(analysis: Analysis): Insights
-    +report_to_mike(result: Any): None
+    +execute_task(task: Task): TaskResult
 }
 
 class IrisAgent extends BaseAgent {
@@ -74,7 +77,7 @@ class IrisAgent extends BaseAgent {
     +search_web(query: str): SearchResults
     +scrape_website(url: str): ScrapedData
     +deep_research(topic: str): ResearchReport
-    +report_to_mike(result: Any): None
+    +execute_task(task: Task): TaskResult
 }
 
 ' Message and Communication
@@ -128,11 +131,13 @@ class TaskOverviewMessage extends Message {
 }
 
 class MessageRouter {
-    +routes: Dict[str, BaseAgent]
+    +agents: Dict[str, BaseAgent]
     +message_queue: Queue[Message]
+    +websocket_server: WebSocketServer
     --
-    +route_to_mike(message: Message): None
-    +route_from_mike(message: Message, target: str): None
+    +register_agent(agent: BaseAgent): None
+    +route_message(message: Message): None
+    +send_to_agent(agent_name: str, message: Message): None
     +broadcast_message(message: Message, agents: List[str]): None
     +get_conversation_history(session_id: str): List[Message]
     +send_to_websocket(session_id: str, message: Message): None
@@ -166,16 +171,21 @@ enum TaskStatus {
 }
 
 class TaskScheduler {
+    +agents: Dict[str, BaseAgent]
     +task_queue: PriorityQueue[Task]
     +active_tasks: Dict[str, Task]
+    +message_router: MessageRouter
     --
+    +register_agent(agent: BaseAgent): None
     +schedule_task(task: Task): None
+    +assign_task_to_agent(task: Task): None
     +get_next_task(): Optional[Task]
     +update_task_status(task_id: str, status: TaskStatus): None
     +update_task_progress(task_id: str, progress: float): None
+    +on_task_completed(task_id: str, agent_name: str): None
     +resolve_dependencies(task: Task): bool
     +broadcast_task_update(session_id: str): None
-    +notify_mike_on_completion(task: Task): None
+    +notify_mike(task_id: str, result: Any): None
 }
 
 class TaskPlan {
@@ -191,17 +201,6 @@ class TaskPlan {
     +mark_task_completed(task_id: str): None
     +calculate_overall_progress(): float
     +is_completed(): bool
-}
-
-class AgentManager {
-    +agents: Dict[str, BaseAgent]
-    +mike_agent: MikeAgent
-    --
-    +get_agent(agent_name: str): BaseAgent
-    +register_agent(agent: BaseAgent): None
-    +execute_mike_instruction(instruction: Instruction): None
-    +route_message_to_agent(agent_name: str, message: Message): None
-    +notify_mike_completion(agent_name: str, result: Any): None
 }
 
 ' LLM Service
@@ -391,37 +390,53 @@ class WebSocketServer {
 ' Relationships
 BaseAgent --> LLMService : uses
 BaseAgent --> ToolExecutor : uses
+BaseAgent --> MessageRouter : uses
 BaseAgent --> Message : sends/receives
 
-MikeAgent --> AgentManager : 使用技术支撑
-MikeAgent --> TaskScheduler : 创建和监控任务
-MikeAgent --> TaskPlan : 创建和管理
-MikeAgent --> TaskOverviewMessage : 创建任务总览
-MikeAgent "1" --> "*" EmmaAgent : 分配任务
-MikeAgent "1" --> "*" BobAgent : 分配任务
-MikeAgent "1" --> "*" AlexAgent : 分配任务
-MikeAgent "1" --> "*" DavidAgent : 分配任务
-MikeAgent "1" --> "*" IrisAgent : 分配任务
+MikeAgent "1" *-- "*" EmmaAgent : manages
+MikeAgent "1" *-- "*" BobAgent : manages
+MikeAgent "1" *-- "*" AlexAgent : manages
+MikeAgent "1" *-- "*" DavidAgent : manages
+MikeAgent "1" *-- "*" IrisAgent : manages
+MikeAgent --> TaskScheduler : coordinates
+MikeAgent --> TaskOverviewMessage : creates
 
-AgentManager --> BaseAgent : 管理实例
-TaskScheduler --> Task : 调度
-TaskScheduler --> MikeAgent : 完成时通知
-MessageRouter --> MikeAgent : 路由到Mike
-MessageRouter --> BaseAgent : 从Mike路由
-MessageRouter --> WebSocketServer : 发送到前端
+TaskScheduler "1" <--> "*" BaseAgent : assigns/notifies
+TaskScheduler --> Task : schedules
+TaskScheduler --> MessageRouter : broadcasts
 
-SessionManager --> Session : 管理
-Session --> Context : 包含
-Context --> TaskPlan : 包含
-ContextStore --> Context : 存储
-LLMService --> LLMProvider : 使用
-ToolExecutor --> Tool : 执行
-CodeSandbox --> ExecutionResult : 产生
+MessageRouter "1" <--> "*" BaseAgent : routes
+MessageRouter --> WebSocketServer : sends to
 
-APIGateway --> MikeAgent : 转发请求
-APIGateway --> SessionManager : 使用
-WebSocketServer --> MessageRouter : 使用
-Message <|-- AgentMessage : 扩展
-Message <|-- TaskOverviewMessage : 扩展
+SessionManager --> Session : manages
+Session --> Context : contains
+Context --> TaskPlan : contains
+ContextStore --> Context : stores
+LLMService --> LLMProvider : uses
+ToolExecutor --> Tool : executes
+CodeSandbox --> ExecutionResult : produces
+APIGateway --> MikeAgent : forwards to
+APIGateway --> SessionManager : uses
+WebSocketServer --> MessageRouter : uses
+Message <|-- AgentMessage : extends
+Message <|-- TaskOverviewMessage : extends
+
+note right of MikeAgent
+  优化点1:
+  Mike直接管理团队成员
+  无需Agent Manager
+end note
+
+note right of TaskScheduler
+  优化点2:
+  与所有Agent双向关联
+  分配任务和接收完成通知
+end note
+
+note right of MessageRouter
+  优化点3:
+  连接所有Agent
+  支持Agent间通信和状态广播
+end note
 
 @enduml

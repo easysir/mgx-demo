@@ -36,25 +36,27 @@ package "API Gateway Layer" {
 package "Agent Orchestration Layer" {
     [Mike Agent\n(Team Leader)] <<leader>> as MikeAgent
     note right of MikeAgent
-        核心决策者和协调者:
-        - 唯一入口，接收所有用户请求
-        - 需求分析和任务规划
-        - 团队协调和任务分配
-        - 进度监控和质量把关
-        - 审查交付物并反馈用户
-    end note
-    
-    [Agent Manager] <<backend>> as AgentManager
-    note right of AgentManager
-        技术支撑层:
-        - 管理Agent实例
-        - 消息路由
-        - 会话状态维护
-        - 执行Mike的指令
+        核心决策者:
+        - 直接管理团队成员
+        - 通过Task Scheduler协调任务
+        - 通过Message Router通信
     end note
     
     [Task Scheduler] <<backend>> as TaskScheduler
+    note right of TaskScheduler
+        任务调度中心:
+        - 与所有Agent双向关联
+        - 分配任务到Agent
+        - 接收Agent完成通知
+    end note
+    
     [Message Router] <<backend>> as MessageRouter
+    note right of MessageRouter
+        消息路由中心:
+        - 连接所有Agent
+        - 路由Agent间消息
+        - 发送状态到WebSocket
+    end note
     
     package "Execution Team" {
         [Emma Agent\n(PM)] <<backend>> as EmmaAgent
@@ -111,27 +113,38 @@ PreviewPanel --> APIGateway : REST
 
 ' API Gateway connections
 APIGateway --> AuthMiddleware
-AuthMiddleware --> MikeAgent : 所有请求先到Mike
+AuthMiddleware --> MikeAgent : 所有请求到Mike
 WSServer --> MessageRouter
 
-' Mike as central coordinator
-MikeAgent --> AgentManager : 使用技术支撑
-MikeAgent --> TaskScheduler : 创建和监控任务
-MikeAgent --> MessageRouter : 发送指令和接收汇报
+' Mike manages team directly
+MikeAgent --> EmmaAgent : 直接管理
+MikeAgent --> BobAgent : 直接管理
+MikeAgent --> AlexAgent : 直接管理
+MikeAgent --> DavidAgent : 直接管理
+MikeAgent --> IrisAgent : 直接管理
 
-' Agent Manager supports Mike
-AgentManager --> EmmaAgent : 管理实例
-AgentManager --> BobAgent : 管理实例
-AgentManager --> AlexAgent : 管理实例
-AgentManager --> DavidAgent : 管理实例
-AgentManager --> IrisAgent : 管理实例
+' Mike uses Task Scheduler and Message Router
+MikeAgent --> TaskScheduler : 协调任务
+MikeAgent --> MessageRouter : 发送消息
 
-' Execution team reports to Mike
-EmmaAgent --> MikeAgent : 完成后汇报
-BobAgent --> MikeAgent : 完成后汇报
-AlexAgent --> MikeAgent : 完成后汇报
-DavidAgent --> MikeAgent : 完成后汇报
-IrisAgent --> MikeAgent : 完成后汇报
+' Task Scheduler connects to all Agents (bidirectional)
+TaskScheduler <--> EmmaAgent : 分配任务/完成通知
+TaskScheduler <--> BobAgent : 分配任务/完成通知
+TaskScheduler <--> AlexAgent : 分配任务/完成通知
+TaskScheduler <--> DavidAgent : 分配任务/完成通知
+TaskScheduler <--> IrisAgent : 分配任务/完成通知
+TaskScheduler <--> MikeAgent : 协调
+
+' Message Router connects to all Agents
+MessageRouter <--> MikeAgent : 消息路由
+MessageRouter <--> EmmaAgent : 消息路由
+MessageRouter <--> BobAgent : 消息路由
+MessageRouter <--> AlexAgent : 消息路由
+MessageRouter <--> DavidAgent : 消息路由
+MessageRouter <--> IrisAgent : 消息路由
+
+' Message Router to WebSocket
+MessageRouter --> WSServer : 广播状态更新
 
 ' All agents use core services
 MikeAgent --> LLMService
@@ -178,6 +191,20 @@ note bottom of ChatUI
   ChatUI 30% | Editor+Preview 70%
   
   支持折叠以最大化预览空间
+end note
+
+note bottom of TaskScheduler
+  优化点2:
+  Task Scheduler与所有Agent双向关联
+  分配任务 → Agent
+  Agent → 完成通知
+end note
+
+note bottom of MessageRouter
+  优化点3:
+  Message Router连接所有Agent
+  支持Agent间点对点通信
+  所有Agent可发送状态到WebSocket
 end note
 
 @enduml
