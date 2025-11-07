@@ -1,0 +1,343 @@
+@startuml MGX_MVP_Class_Diagram
+
+' Core Agent System
+abstract class BaseAgent {
+    +agent_id: str
+    +role: str
+    +capabilities: List[str]
+    +llm_config: LLMConfig
+    +tools: List[Tool]
+    +memory: AgentMemory
+    --
+    +{abstract} process_message(message: Message): Response
+    +execute_tool(tool_name: str, params: Dict): ToolResult
+    +think(context: Context): Thought
+    +act(action: Action): ActionResult
+}
+
+class MikeAgent extends BaseAgent {
+    +team_members: List[BaseAgent]
+    +task_queue: TaskQueue
+    --
+    +coordinate_task(task: Task): TaskPlan
+    +assign_task(task: Task, agent: BaseAgent): Assignment
+    +monitor_progress(): ProgressReport
+}
+
+class EmmaAgent extends BaseAgent {
+    +research_tools: List[Tool]
+    --
+    +analyze_requirements(input: str): PRD
+    +conduct_research(topic: str): ResearchReport
+    +create_prd(requirements: Dict): PRD
+}
+
+class BobAgent extends BaseAgent {
+    +design_tools: List[Tool]
+    --
+    +design_architecture(prd: PRD): Architecture
+    +create_diagrams(design: Design): List[Diagram]
+    +review_design(code: str): DesignReview
+}
+
+class AlexAgent extends BaseAgent {
+    +coding_tools: List[Tool]
+    +deployment_tools: List[Tool]
+    --
+    +write_code(spec: Specification): Code
+    +test_code(code: Code): TestResult
+    +deploy_application(app: Application): DeploymentResult
+}
+
+class DavidAgent extends BaseAgent {
+    +analysis_tools: List[Tool]
+    --
+    +analyze_data(data: DataFrame): Analysis
+    +create_visualization(data: DataFrame): Visualization
+    +generate_insights(analysis: Analysis): Insights
+}
+
+class IrisAgent extends BaseAgent {
+    +search_tools: List[Tool]
+    +scraping_tools: List[Tool]
+    --
+    +search_web(query: str): SearchResults
+    +scrape_website(url: str): ScrapedData
+    +deep_research(topic: str): ResearchReport
+}
+
+' Message and Communication
+class Message {
+    +message_id: str
+    +sender: str
+    +receiver: str
+    +content: str
+    +message_type: MessageType
+    +timestamp: datetime
+    +metadata: Dict
+    --
+    +to_dict(): Dict
+    +from_dict(data: Dict): Message
+}
+
+enum MessageType {
+    USER_INPUT
+    AGENT_RESPONSE
+    TASK_ASSIGNMENT
+    TOOL_EXECUTION
+    SYSTEM_NOTIFICATION
+}
+
+class MessageRouter {
+    +routes: Dict[str, BaseAgent]
+    +message_queue: Queue[Message]
+    --
+    +route_message(message: Message): None
+    +broadcast_message(message: Message, agents: List[str]): None
+    +get_conversation_history(session_id: str): List[Message]
+}
+
+' Task Management
+class Task {
+    +task_id: str
+    +task_type: str
+    +description: str
+    +assignee: str
+    +dependencies: List[str]
+    +status: TaskStatus
+    +priority: int
+    +created_at: datetime
+    +completed_at: Optional[datetime]
+    --
+    +mark_completed(): None
+    +add_dependency(task_id: str): None
+}
+
+enum TaskStatus {
+    PENDING
+    IN_PROGRESS
+    COMPLETED
+    FAILED
+    BLOCKED
+}
+
+class TaskScheduler {
+    +task_queue: PriorityQueue[Task]
+    +active_tasks: Dict[str, Task]
+    --
+    +schedule_task(task: Task): None
+    +get_next_task(): Optional[Task]
+    +update_task_status(task_id: str, status: TaskStatus): None
+    +resolve_dependencies(task: Task): bool
+}
+
+class TaskPlan {
+    +plan_id: str
+    +goal: str
+    +tasks: List[Task]
+    +current_task_index: int
+    --
+    +add_task(task: Task): None
+    +get_current_task(): Optional[Task]
+    +mark_task_completed(task_id: str): None
+    +is_completed(): bool
+}
+
+' LLM Service
+class LLMService {
+    +providers: Dict[str, LLMProvider]
+    +default_provider: str
+    +fallback_chain: List[str]
+    --
+    +generate(prompt: str, model: str, params: Dict): LLMResponse
+    +stream_generate(prompt: str, model: str, params: Dict): Iterator[str]
+    +embed(text: str, model: str): List[float]
+    +switch_provider(provider: str): None
+}
+
+interface LLMProvider {
+    +{abstract} generate(prompt: str, params: Dict): str
+    +{abstract} stream(prompt: str, params: Dict): Iterator[str]
+    +{abstract} embed(text: str): List[float]
+}
+
+class OpenAIProvider implements LLMProvider {
+    +api_key: str
+    +client: OpenAI
+    --
+    +generate(prompt: str, params: Dict): str
+    +stream(prompt: str, params: Dict): Iterator[str]
+    +embed(text: str): List[float]
+}
+
+class AnthropicProvider implements LLMProvider {
+    +api_key: str
+    +client: Anthropic
+    --
+    +generate(prompt: str, params: Dict): str
+    +stream(prompt: str, params: Dict): Iterator[str]
+    +embed(text: str): List[float]
+}
+
+class LLMConfig {
+    +model: str
+    +temperature: float
+    +max_tokens: int
+    +top_p: float
+    +frequency_penalty: float
+    +presence_penalty: float
+}
+
+' Tool System
+interface Tool {
+    +tool_name: str
+    +description: str
+    +parameters: Dict
+    --
+    +{abstract} execute(params: Dict): ToolResult
+    +{abstract} validate_params(params: Dict): bool
+}
+
+class EditorTool implements Tool {
+    +file_system: FileSystem
+    --
+    +execute(params: Dict): ToolResult
+    +read_file(path: str): str
+    +write_file(path: str, content: str): bool
+    +edit_file(path: str, changes: List[Edit]): bool
+}
+
+class TerminalTool implements Tool {
+    +sandbox: CodeSandbox
+    --
+    +execute(params: Dict): ToolResult
+    +run_command(cmd: str): CommandResult
+    +get_output(): str
+}
+
+class SearchTool implements Tool {
+    +search_engine: SearchEngine
+    --
+    +execute(params: Dict): ToolResult
+    +web_search(query: str): List[SearchResult]
+    +similarity_search(query: str, docs: List[str]): List[str]
+}
+
+class ToolExecutor {
+    +tools: Dict[str, Tool]
+    +execution_history: List[ToolExecution]
+    --
+    +register_tool(tool: Tool): None
+    +execute_tool(tool_name: str, params: Dict): ToolResult
+    +get_available_tools(): List[str]
+}
+
+class ToolResult {
+    +success: bool
+    +output: Any
+    +error: Optional[str]
+    +execution_time: float
+}
+
+' Session and Context Management
+class Session {
+    +session_id: str
+    +user_id: str
+    +created_at: datetime
+    +last_active: datetime
+    +context: Context
+    +messages: List[Message]
+    --
+    +add_message(message: Message): None
+    +get_recent_messages(count: int): List[Message]
+    +update_context(key: str, value: Any): None
+}
+
+class Context {
+    +session_id: str
+    +working_directory: str
+    +file_tree: FileTree
+    +variables: Dict[str, Any]
+    +conversation_history: List[Message]
+    --
+    +get(key: str): Any
+    +set(key: str, value: Any): None
+    +to_dict(): Dict
+}
+
+class SessionManager {
+    +active_sessions: Dict[str, Session]
+    +db: Database
+    --
+    +create_session(user_id: str): Session
+    +get_session(session_id: str): Optional[Session]
+    +update_session(session: Session): None
+    +delete_session(session_id: str): None
+    +cleanup_expired_sessions(): int
+}
+
+class ContextStore {
+    +redis_client: Redis
+    +vector_db: VectorDB
+    --
+    +save_context(session_id: str, context: Context): None
+    +load_context(session_id: str): Optional[Context]
+    +search_similar_context(query: str, limit: int): List[Context]
+    +add_to_memory(session_id: str, content: str): None
+}
+
+' Code Execution
+class CodeSandbox {
+    +container_id: str
+    +image: str
+    +working_dir: str
+    +environment: Dict[str, str]
+    --
+    +execute_code(code: str, language: str): ExecutionResult
+    +install_package(package: str): bool
+    +cleanup(): None
+}
+
+class ExecutionResult {
+    +stdout: str
+    +stderr: str
+    +exit_code: int
+    +execution_time: float
+}
+
+' API Layer
+class APIGateway {
+    +routes: Dict[str, Callable]
+    +middleware: List[Middleware]
+    --
+    +register_route(path: str, handler: Callable): None
+    +handle_request(request: Request): Response
+}
+
+class WebSocketServer {
+    +connections: Dict[str, WebSocket]
+    +message_router: MessageRouter
+    --
+    +connect(session_id: str, websocket: WebSocket): None
+    +disconnect(session_id: str): None
+    +broadcast(message: Message): None
+    +send_to_session(session_id: str, message: Message): None
+}
+
+' Relationships
+BaseAgent --> LLMService : uses
+BaseAgent --> ToolExecutor : uses
+BaseAgent --> Message : sends/receives
+MikeAgent --> TaskScheduler : manages
+TaskScheduler --> Task : schedules
+MessageRouter --> BaseAgent : routes to
+SessionManager --> Session : manages
+Session --> Context : contains
+ContextStore --> Context : stores
+LLMService --> LLMProvider : uses
+ToolExecutor --> Tool : executes
+CodeSandbox --> ExecutionResult : produces
+APIGateway --> SessionManager : uses
+WebSocketServer --> MessageRouter : uses
+
+@enduml

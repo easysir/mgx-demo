@@ -1,0 +1,139 @@
+@startuml MGX_MVP_UI_Navigation
+
+[*] --> Home : User visits platform
+
+state "Home Page" as Home {
+    [*] --> Landing
+    Landing : - Hero section
+    Landing : - Feature highlights
+    Landing : - Quick start CTA
+}
+
+state "Authentication" as Auth {
+    [*] --> Login
+    Login : - Email/password
+    Login : - OAuth options
+    Login --> Register : Sign up link
+    Register --> Login : Back to login
+}
+
+state "Dashboard" as Dashboard {
+    [*] --> Overview
+    Overview : - Recent sessions
+    Overview : - Quick actions
+    Overview : - Usage stats
+}
+
+state "Chat Interface" as Chat {
+    [*] --> ChatView
+    ChatView : - Message history
+    ChatView : - Input box
+    ChatView : - Agent indicators
+    ChatView : - File attachments
+    
+    ChatView --> TaskPanel : View tasks
+    ChatView --> CodeEditor : Edit code
+    ChatView --> FileManager : Manage files
+    
+    state "Task Panel" as TaskPanel {
+        [*] --> TaskList
+        TaskList : - Current tasks
+        TaskList : - Task status
+        TaskList : - Dependencies
+    }
+    
+    state "Code Editor" as CodeEditor {
+        [*] --> EditorView
+        EditorView : - Syntax highlighting
+        EditorView : - File tabs
+        EditorView : - Terminal
+    }
+    
+    state "File Manager" as FileManager {
+        [*] --> FileTree
+        FileTree : - Directory structure
+        FileTree : - File operations
+        FileTree : - Search
+    }
+}
+
+state "Preview & Deploy" as Preview {
+    [*] --> PreviewMode
+    PreviewMode : - Live preview
+    PreviewMode : - Responsive views
+    PreviewMode : - Console logs
+    
+    PreviewMode --> DeployOptions : Deploy button
+    
+    state "Deploy Options" as DeployOptions {
+        [*] --> PlatformSelect
+        PlatformSelect : - Vercel
+        PlatformSelect : - Netlify
+        PlatformSelect : - GitHub Pages
+    }
+}
+
+state "Projects" as Projects {
+    [*] --> ProjectList
+    ProjectList : - All projects
+    ProjectList : - Search/filter
+    ProjectList --> ProjectDetail : Select project
+    
+    state "Project Detail" as ProjectDetail {
+        [*] --> ProjectInfo
+        ProjectInfo : - Project metadata
+        ProjectInfo : - Sessions
+        ProjectInfo : - Deployments
+    }
+}
+
+state "Settings" as Settings {
+    [*] --> UserSettings
+    UserSettings : - Profile
+    UserSettings : - API keys
+    UserSettings : - Preferences
+    UserSettings : - Billing
+}
+
+' Main navigation flow
+Home --> Auth : Sign in/up
+Auth --> Dashboard : Authenticated
+
+Dashboard --> Chat : New session
+Dashboard --> Projects : View projects
+Dashboard --> Settings : Settings icon
+
+Chat --> Preview : Preview button
+Chat --> Dashboard : Home button
+Chat --> Projects : Save project
+Chat --> Settings : Settings icon
+
+Preview --> Chat : Back to chat
+Preview --> Projects : Save & exit
+
+Projects --> Chat : Open session
+Projects --> Dashboard : Back
+Projects --> Settings : Settings icon
+
+Settings --> Dashboard : Back
+Settings --> Chat : Back to session
+Settings --> Projects : Back to projects
+
+' Quick actions from any state
+Chat --> [*] : Logout
+Dashboard --> [*] : Logout
+Projects --> [*] : Logout
+Settings --> [*] : Logout
+
+note right of Chat
+    Primary workspace
+    Max depth: 3 levels
+    Always accessible back button
+end note
+
+note right of Preview
+    Quick access to deploy
+    No more than 2 clicks from chat
+end note
+
+@enduml

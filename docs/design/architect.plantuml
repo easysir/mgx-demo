@@ -1,0 +1,163 @@
+@startuml MGX_MVP_Architecture
+
+!define RECTANGLE class
+
+skinparam packageStyle rectangle
+skinparam component {
+    BackgroundColor<<frontend>> LightBlue
+    BackgroundColor<<backend>> LightGreen
+    BackgroundColor<<infrastructure>> LightYellow
+    BackgroundColor<<external>> LightGray
+}
+
+package "Frontend Layer" {
+    [Web UI] <<frontend>> as WebUI
+    [Chat Interface] <<frontend>> as ChatUI
+    [Code Editor\n(Monaco)] <<frontend>> as CodeEditor
+    [File Manager] <<frontend>> as FileManager
+    [Preview Panel] <<frontend>> as PreviewPanel
+    [Task Dashboard] <<frontend>> as TaskDashboard
+}
+
+package "API Gateway Layer" {
+    [FastAPI Gateway] <<backend>> as APIGateway
+    [WebSocket Server] <<backend>> as WSServer
+    [Authentication\nMiddleware] <<backend>> as AuthMiddleware
+}
+
+package "Agent Orchestration Layer" {
+    [Agent Manager] <<backend>> as AgentManager
+    [Task Scheduler] <<backend>> as TaskScheduler
+    [Message Router] <<backend>> as MessageRouter
+    
+    package "Agent Pool" {
+        [Mike Agent\n(Team Lead)] <<backend>> as MikeAgent
+        [Emma Agent\n(PM)] <<backend>> as EmmaAgent
+        [Bob Agent\n(Architect)] <<backend>> as BobAgent
+        [Alex Agent\n(Engineer)] <<backend>> as AlexAgent
+        [David Agent\n(Data Analyst)] <<backend>> as DavidAgent
+        [Iris Agent\n(Researcher)] <<backend>> as IrisAgent
+    }
+}
+
+package "Core Services Layer" {
+    [LLM Service] <<backend>> as LLMService
+    [Tool Executor] <<backend>> as ToolExecutor
+    [Code Sandbox] <<backend>> as CodeSandbox
+    [Session Manager] <<backend>> as SessionManager
+    [Context Store] <<backend>> as ContextStore
+}
+
+package "Tool & Integration Layer" {
+    [Editor Tool] <<backend>> as EditorTool
+    [Terminal Tool] <<backend>> as TerminalTool
+    [Search Tool] <<backend>> as SearchTool
+    [Git Integration] <<backend>> as GitTool
+    [Supabase Client] <<backend>> as SupabaseClient
+}
+
+package "Data Layer" {
+    database "PostgreSQL\n(Sessions, Users)" <<infrastructure>> as PostgreSQL
+    database "Redis\n(Cache, Queue)" <<infrastructure>> as Redis
+    database "Vector DB\n(Embeddings)" <<infrastructure>> as VectorDB
+    [File Storage\n(S3/Local)] <<infrastructure>> as FileStorage
+}
+
+package "External Services" {
+    [OpenAI API] <<external>> as OpenAI
+    [Anthropic API] <<external>> as Anthropic
+    [Google Gemini] <<external>> as Gemini
+    [GitHub API] <<external>> as GitHub
+    [Supabase] <<external>> as Supabase
+}
+
+' Frontend connections
+WebUI --> ChatUI
+WebUI --> CodeEditor
+WebUI --> FileManager
+WebUI --> PreviewPanel
+WebUI --> TaskDashboard
+
+' Frontend to API Gateway
+ChatUI --> APIGateway : REST/WebSocket
+CodeEditor --> APIGateway : REST
+FileManager --> APIGateway : REST
+PreviewPanel --> APIGateway : REST
+TaskDashboard --> WSServer : WebSocket
+
+' API Gateway connections
+APIGateway --> AuthMiddleware
+AuthMiddleware --> AgentManager
+WSServer --> MessageRouter
+
+' Agent Orchestration
+AgentManager --> TaskScheduler
+TaskScheduler --> MessageRouter
+MessageRouter --> MikeAgent
+MessageRouter --> EmmaAgent
+MessageRouter --> BobAgent
+MessageRouter --> AlexAgent
+MessageRouter --> DavidAgent
+MessageRouter --> IrisAgent
+
+' Agents to Core Services
+MikeAgent --> LLMService
+EmmaAgent --> LLMService
+BobAgent --> LLMService
+AlexAgent --> LLMService
+DavidAgent --> LLMService
+IrisAgent --> LLMService
+
+MikeAgent --> ToolExecutor
+EmmaAgent --> ToolExecutor
+BobAgent --> ToolExecutor
+AlexAgent --> ToolExecutor
+DavidAgent --> ToolExecutor
+IrisAgent --> ToolExecutor
+
+' Core Services connections
+ToolExecutor --> EditorTool
+ToolExecutor --> TerminalTool
+ToolExecutor --> SearchTool
+ToolExecutor --> GitTool
+ToolExecutor --> SupabaseClient
+
+LLMService --> SessionManager
+SessionManager --> ContextStore
+ToolExecutor --> CodeSandbox
+
+' Data Layer connections
+SessionManager --> PostgreSQL
+ContextStore --> Redis
+ContextStore --> VectorDB
+EditorTool --> FileStorage
+CodeSandbox --> FileStorage
+
+' External Services
+LLMService --> OpenAI
+LLMService --> Anthropic
+LLMService --> Gemini
+GitTool --> GitHub
+SupabaseClient --> Supabase
+
+note right of AgentManager
+  Manages agent lifecycle,
+  routing, and coordination
+end note
+
+note right of TaskScheduler
+  Handles task queue,
+  dependencies, and execution order
+end note
+
+note right of CodeSandbox
+  Isolated execution environment
+  using Docker containers
+end note
+
+note right of LLMService
+  Multi-model support with
+  fallback and load balancing
+end note
+
+@enduml

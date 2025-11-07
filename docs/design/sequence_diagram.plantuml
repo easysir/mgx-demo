@@ -1,0 +1,209 @@
+@startuml MGX_MVP_Sequence_Diagram
+
+actor User
+participant "Web UI" as UI
+participant "API Gateway" as API
+participant "WebSocket Server" as WS
+participant "Session Manager" as SM
+participant "Agent Manager" as AM
+participant "Mike Agent" as Mike
+participant "Bob Agent" as Bob
+participant "Alex Agent" as Alex
+participant "LLM Service" as LLM
+participant "Tool Executor" as TE
+participant "Code Sandbox" as CS
+participant "Database" as DB
+
+== User Session Initialization ==
+User -> UI: Access Platform
+UI -> API: POST /api/sessions/create
+    note right
+        Input: {
+            "user_id": "string"
+        }
+    end note
+API -> SM: create_session(user_id)
+SM -> DB: INSERT session
+DB --> SM: session_id
+SM --> API: Session
+    note right
+        Output: {
+            "session_id": "uuid",
+            "created_at": "timestamp",
+            "ws_url": "string"
+        }
+    end note
+API --> UI: Session Info
+UI -> WS: Connect WebSocket(session_id)
+WS -> SM: register_connection(session_id)
+WS --> UI: Connection Established
+
+== User Submits Development Request ==
+User -> UI: "Create a portfolio website"
+UI -> API: POST /api/chat/message
+    note right
+        Input: {
+            "session_id": "uuid",
+            "content": "Create a portfolio website",
+            "message_type": "USER_INPUT"
+        }
+    end note
+API -> SM: get_session(session_id)
+SM --> API: Session with Context
+API -> AM: process_user_request(message, context)
+
+== Agent Orchestration - Task Planning ==
+AM -> Mike: process_message(message)
+Mike -> LLM: generate(prompt, model="gpt-4")
+    note right
+        Prompt: "Analyze this request and create a task plan:
+        User wants to create a portfolio website.
+        Break down into tasks for team members."
+    end note
+LLM --> Mike: Task Plan
+    note right
+        Output: {
+            "tasks": [
+                {
+                    "task_id": "task-1",
+                    "assignee": "Emma",
+                    "description": "Create PRD"
+                },
+                {
+                    "task_id": "task-2",
+                    "assignee": "Bob",
+                    "description": "Design architecture",
+                    "dependencies": ["task-1"]
+                },
+                {
+                    "task_id": "task-3",
+                    "assignee": "Alex",
+                    "description": "Implement website",
+                    "dependencies": ["task-2"]
+                }
+            ]
+        }
+    end note
+Mike -> AM: create_task_plan(tasks)
+AM -> WS: send_message(session_id, "Task plan created")
+WS --> UI: Display Task Plan
+
+== Task Execution - Architecture Design ==
+AM -> Bob: assign_task(task-2)
+Bob -> TE: execute_tool("Editor.read", {"path": "prd.md"})
+TE --> Bob: PRD Content
+Bob -> LLM: generate(prompt, model="claude-sonnet")
+    note right
+        Prompt: "Based on this PRD, design a system architecture
+        for a portfolio website. Include component diagram,
+        data flow, and tech stack recommendations."
+    end note
+LLM --> Bob: Architecture Design
+Bob -> TE: execute_tool("Editor.write", params)
+    note right
+        Input: {
+            "path": "docs/architecture.md",
+            "content": "# System Architecture\n..."
+        }
+    end note
+TE --> Bob: File Written
+Bob -> AM: task_completed(task-2, outputs)
+AM -> WS: send_message(session_id, "Architecture design completed")
+WS --> UI: Display Architecture Document
+
+== Task Execution - Code Implementation ==
+AM -> Alex: assign_task(task-3)
+Alex -> TE: execute_tool("Editor.read", {"path": "docs/architecture.md"})
+TE --> Alex: Architecture Spec
+Alex -> LLM: generate(prompt, model="gpt-4")
+    note right
+        Prompt: "Implement a portfolio website based on this
+        architecture. Use React, TypeScript, and Tailwind CSS."
+    end note
+LLM --> Alex: Code Generation Plan
+
+loop For each component
+    Alex -> LLM: generate_code(component_spec)
+    LLM --> Alex: Component Code
+    Alex -> TE: execute_tool("Editor.write", params)
+        note right
+            Input: {
+                "path": "src/components/Header.tsx",
+                "content": "import React from 'react';\n..."
+            }
+        end note
+    TE --> Alex: File Written
+end
+
+Alex -> TE: execute_tool("Terminal.run", {"cmd": "npm install"})
+TE -> CS: execute_command("npm install")
+CS --> TE: Command Output
+    note right
+        Output: {
+            "stdout": "added 1234 packages",
+            "stderr": "",
+            "exit_code": 0
+        }
+    end note
+TE --> Alex: Installation Complete
+
+Alex -> TE: execute_tool("Terminal.run", {"cmd": "npm run build"})
+TE -> CS: execute_command("npm run build")
+CS --> TE: Build Output
+TE --> Alex: Build Complete
+
+Alex -> AM: task_completed(task-3, outputs)
+AM -> WS: send_message(session_id, "Website implementation completed")
+WS --> UI: Display Success Message
+
+== Code Preview and Deployment ==
+User -> UI: Click "Preview"
+UI -> API: GET /api/preview/{session_id}
+API -> SM: get_session_files(session_id)
+SM -> DB: SELECT files WHERE session_id = ?
+DB --> SM: File List
+SM --> API: Files
+API --> UI: Preview Data
+UI -> UI: Render Preview
+
+User -> UI: Click "Deploy"
+UI -> API: POST /api/deploy
+    note right
+        Input: {
+            "session_id": "uuid",
+            "platform": "vercel"
+        }
+    end note
+API -> AM: deploy_application(session_id, platform)
+AM -> Alex: handle_deployment(platform)
+Alex -> TE: execute_tool("Git.push", params)
+    note right
+        Input: {
+            "repo_url": "github.com/user/repo",
+            "branch": "main",
+            "files": ["src/*", "package.json"]
+        }
+    end note
+TE --> Alex: Git Push Success
+Alex -> TE: execute_tool("Deploy.vercel", params)
+TE --> Alex: Deployment URL
+    note right
+        Output: {
+            "success": true,
+            "url": "https://portfolio-abc123.vercel.app",
+            "deployment_id": "dpl_xyz"
+        }
+    end note
+Alex -> AM: deployment_completed(url)
+AM -> WS: send_message(session_id, deployment_info)
+WS --> UI: Display Deployment URL
+UI --> User: Show Live Website Link
+
+== Context Persistence ==
+AM -> SM: update_session_context(session_id, context)
+SM -> DB: UPDATE sessions SET context = ? WHERE id = ?
+DB --> SM: Success
+SM -> ContextStore: save_context(session_id, context)
+ContextStore --> SM: Saved
+
+@enduml

@@ -1,0 +1,169 @@
+@startuml MGX_MVP_ER_Diagram
+
+' Entities
+entity "users" as users {
+    * id : uuid <<PK>>
+    --
+    * email : varchar(255)
+    * username : varchar(100)
+    * password_hash : varchar(255)
+    * created_at : timestamp
+    * last_login : timestamp
+    subscription_tier : varchar(50)
+    credits_remaining : integer
+}
+
+entity "sessions" as sessions {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * created_at : timestamp
+    * last_active : timestamp
+    * status : varchar(20)
+    working_directory : text
+    context_data : jsonb
+}
+
+entity "messages" as messages {
+    * id : uuid <<PK>>
+    --
+    * session_id : uuid <<FK>>
+    * sender : varchar(50)
+    * receiver : varchar(50)
+    * content : text
+    * message_type : varchar(50)
+    * timestamp : timestamp
+    metadata : jsonb
+}
+
+entity "tasks" as tasks {
+    * id : uuid <<PK>>
+    --
+    * session_id : uuid <<FK>>
+    * task_type : varchar(100)
+    * description : text
+    * assignee : varchar(50)
+    * status : varchar(20)
+    * priority : integer
+    * created_at : timestamp
+    * completed_at : timestamp
+    dependencies : text[]
+    output_data : jsonb
+}
+
+entity "files" as files {
+    * id : uuid <<PK>>
+    --
+    * session_id : uuid <<FK>>
+    * file_path : text
+    * content : text
+    * file_type : varchar(50)
+    * size : bigint
+    * created_at : timestamp
+    * updated_at : timestamp
+    checksum : varchar(64)
+}
+
+entity "deployments" as deployments {
+    * id : uuid <<PK>>
+    --
+    * session_id : uuid <<FK>>
+    * platform : varchar(50)
+    * deployment_url : text
+    * deployment_id : varchar(255)
+    * status : varchar(20)
+    * created_at : timestamp
+    config : jsonb
+}
+
+entity "agent_executions" as agent_executions {
+    * id : uuid <<PK>>
+    --
+    * session_id : uuid <<FK>>
+    * agent_name : varchar(50)
+    * task_id : uuid <<FK>>
+    * started_at : timestamp
+    * completed_at : timestamp
+    * status : varchar(20)
+    input_data : jsonb
+    output_data : jsonb
+    error_message : text
+}
+
+entity "tool_executions" as tool_executions {
+    * id : uuid <<PK>>
+    --
+    * agent_execution_id : uuid <<FK>>
+    * tool_name : varchar(100)
+    * parameters : jsonb
+    * result : jsonb
+    * execution_time : float
+    * timestamp : timestamp
+    success : boolean
+    error_message : text
+}
+
+entity "llm_requests" as llm_requests {
+    * id : uuid <<PK>>
+    --
+    * session_id : uuid <<FK>>
+    * agent_name : varchar(50)
+    * model : varchar(100)
+    * provider : varchar(50)
+    * prompt : text
+    * response : text
+    * tokens_used : integer
+    * cost : decimal(10,4)
+    * timestamp : timestamp
+    parameters : jsonb
+}
+
+entity "context_embeddings" as context_embeddings {
+    * id : uuid <<PK>>
+    --
+    * session_id : uuid <<FK>>
+    * content : text
+    * embedding : vector(1536)
+    * created_at : timestamp
+    metadata : jsonb
+}
+
+entity "projects" as projects {
+    * id : uuid <<PK>>
+    --
+    * user_id : uuid <<FK>>
+    * name : varchar(255)
+    * description : text
+    * project_type : varchar(50)
+    * created_at : timestamp
+    * updated_at : timestamp
+    repository_url : text
+    is_public : boolean
+}
+
+entity "project_sessions" as project_sessions {
+    * project_id : uuid <<FK,PK>>
+    * session_id : uuid <<FK,PK>>
+    --
+    created_at : timestamp
+}
+
+' Relationships
+users ||--o{ sessions : "sessions.user_id -> users.id"
+users ||--o{ projects : "projects.user_id -> users.id"
+
+sessions ||--o{ messages : "messages.session_id -> sessions.id"
+sessions ||--o{ tasks : "tasks.session_id -> sessions.id"
+sessions ||--o{ files : "files.session_id -> sessions.id"
+sessions ||--o{ deployments : "deployments.session_id -> sessions.id"
+sessions ||--o{ agent_executions : "agent_executions.session_id -> sessions.id"
+sessions ||--o{ llm_requests : "llm_requests.session_id -> sessions.id"
+sessions ||--o{ context_embeddings : "context_embeddings.session_id -> sessions.id"
+
+tasks ||--o{ agent_executions : "agent_executions.task_id -> tasks.id"
+agent_executions ||--o{ tool_executions : "tool_executions.agent_execution_id -> agent_executions.id"
+
+projects ||--o{ project_sessions : "project_sessions.project_id -> projects.id"
+sessions ||--o{ project_sessions : "project_sessions.session_id -> sessions.id"
+
+@enduml
