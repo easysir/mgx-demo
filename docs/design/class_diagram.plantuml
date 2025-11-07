@@ -22,6 +22,7 @@ class MikeAgent extends BaseAgent {
     +coordinate_task(task: Task): TaskPlan
     +assign_task(task: Task, agent: BaseAgent): Assignment
     +monitor_progress(): ProgressReport
+    +send_task_overview(session_id: str, tasks: List[Task]): None
 }
 
 class EmmaAgent extends BaseAgent {
@@ -83,9 +84,36 @@ class Message {
 enum MessageType {
     USER_INPUT
     AGENT_RESPONSE
+    AGENT_MESSAGE
+    TASK_OVERVIEW
     TASK_ASSIGNMENT
     TOOL_EXECUTION
     SYSTEM_NOTIFICATION
+}
+
+class AgentMessage extends Message {
+    +agent: str
+    +status: AgentStatus
+    +progress: Optional[float]
+    +tasks: Optional[List[Task]]
+    --
+    +create_working_message(agent: str, content: str): AgentMessage
+    +create_completed_message(agent: str, content: str): AgentMessage
+}
+
+enum AgentStatus {
+    WORKING
+    WAITING
+    COMPLETED
+    FAILED
+}
+
+class TaskOverviewMessage extends Message {
+    +agent: str = "Mike"
+    +overall_progress: float
+    +tasks: List[Task]
+    --
+    +update_progress(completed: int, total: int): None
 }
 
 class MessageRouter {
@@ -95,6 +123,7 @@ class MessageRouter {
     +route_message(message: Message): None
     +broadcast_message(message: Message, agents: List[str]): None
     +get_conversation_history(session_id: str): List[Message]
+    +send_to_websocket(session_id: str, message: Message): None
 }
 
 ' Task Management
@@ -106,11 +135,13 @@ class Task {
     +dependencies: List[str]
     +status: TaskStatus
     +priority: int
+    +progress: float
     +created_at: datetime
     +completed_at: Optional[datetime]
     --
     +mark_completed(): None
     +add_dependency(task_id: str): None
+    +update_progress(progress: float): None
 }
 
 enum TaskStatus {
@@ -128,7 +159,9 @@ class TaskScheduler {
     +schedule_task(task: Task): None
     +get_next_task(): Optional[Task]
     +update_task_status(task_id: str, status: TaskStatus): None
+    +update_task_progress(task_id: str, progress: float): None
     +resolve_dependencies(task: Task): bool
+    +broadcast_task_update(session_id: str): None
 }
 
 class TaskPlan {
@@ -136,10 +169,12 @@ class TaskPlan {
     +goal: str
     +tasks: List[Task]
     +current_task_index: int
+    +overall_progress: float
     --
     +add_task(task: Task): None
     +get_current_task(): Optional[Task]
     +mark_task_completed(task_id: str): None
+    +calculate_overall_progress(): float
     +is_completed(): bool
 }
 
@@ -259,6 +294,7 @@ class Context {
     +file_tree: FileTree
     +variables: Dict[str, Any]
     +conversation_history: List[Message]
+    +current_task_plan: Optional[TaskPlan]
     --
     +get(key: str): Any
     +set(key: str, value: Any): None
@@ -322,6 +358,7 @@ class WebSocketServer {
     +disconnect(session_id: str): None
     +broadcast(message: Message): None
     +send_to_session(session_id: str, message: Message): None
+    +stream_agent_response(session_id: str, chunks: Iterator[str]): None
 }
 
 ' Relationships
@@ -329,15 +366,21 @@ BaseAgent --> LLMService : uses
 BaseAgent --> ToolExecutor : uses
 BaseAgent --> Message : sends/receives
 MikeAgent --> TaskScheduler : manages
+MikeAgent --> TaskOverviewMessage : creates
 TaskScheduler --> Task : schedules
+TaskScheduler --> WebSocketServer : broadcasts updates
 MessageRouter --> BaseAgent : routes to
+MessageRouter --> WebSocketServer : sends to
 SessionManager --> Session : manages
 Session --> Context : contains
+Context --> TaskPlan : contains
 ContextStore --> Context : stores
 LLMService --> LLMProvider : uses
 ToolExecutor --> Tool : executes
 CodeSandbox --> ExecutionResult : produces
 APIGateway --> SessionManager : uses
 WebSocketServer --> MessageRouter : uses
+Message <|-- AgentMessage : extends
+Message <|-- TaskOverviewMessage : extends
 
 @enduml

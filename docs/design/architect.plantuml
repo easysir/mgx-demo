@@ -12,11 +12,18 @@ skinparam component {
 
 package "Frontend Layer" {
     [Web UI] <<frontend>> as WebUI
-    [Chat Interface] <<frontend>> as ChatUI
+    [Chat Interface\n(整合版)] <<frontend>> as ChatUI
+    note right of ChatUI
+        整合功能:
+        - 对话消息流
+        - Agent状态展示
+        - 任务进度显示
+        - 输入框
+        - 工作流可视化
+    end note
     [Code Editor\n(Monaco)] <<frontend>> as CodeEditor
     [File Manager] <<frontend>> as FileManager
     [Preview Panel] <<frontend>> as PreviewPanel
-    [Task Dashboard] <<frontend>> as TaskDashboard
 }
 
 package "API Gateway Layer" {
@@ -76,14 +83,13 @@ WebUI --> ChatUI
 WebUI --> CodeEditor
 WebUI --> FileManager
 WebUI --> PreviewPanel
-WebUI --> TaskDashboard
 
 ' Frontend to API Gateway
 ChatUI --> APIGateway : REST/WebSocket
+ChatUI --> WSServer : WebSocket (实时状态+流式输出)
 CodeEditor --> APIGateway : REST
 FileManager --> APIGateway : REST
 PreviewPanel --> APIGateway : REST
-TaskDashboard --> WSServer : WebSocket
 
 ' API Gateway connections
 APIGateway --> AuthMiddleware
@@ -158,6 +164,13 @@ end note
 note right of LLMService
   Multi-model support with
   fallback and load balancing
+end note
+
+note bottom of ChatUI
+  新布局占比:
+  ChatUI 30% | Editor+Preview 70%
+  
+  支持折叠以最大化预览空间
 end note
 
 @enduml

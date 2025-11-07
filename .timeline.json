@@ -1,5 +1,5 @@
 {
-  "timeline_index": 16,
+  "timeline_index": 26,
   "planner": {
     "Team Leader": {
       "1": {
@@ -15,7 +15,7 @@
         "start_at": 1762502991.8606465,
         "end_at": 1762503212.9189897
       },
-      "current_task_id": "2",
+      "current_task_id": "3",
       "2": {
         "task_id": "2",
         "dependent_task_ids": [
@@ -29,7 +29,20 @@
         "is_finished": true,
         "assignee": "Bob",
         "start_at": 1762503212.9190218,
-        "end_at": 1762503578.3017898
+        "end_at": 1762515713.5688925
+      },
+      "3": {
+        "task_id": "3",
+        "dependent_task_ids": [],
+        "instruction": "更新架构设计文档和UML图,将TaskDashboard整合到ChatUI中。\n\n**修改要点:**\n\n1. **删除TaskDashboard组件**\n   - 从组件架构图中移除独立的TaskDashboard\n   - 将其功能整合到ChatUI中\n\n2. **扩展ChatUI功能**\n   - 支持多种消息类型:普通消息、Agent工作消息、任务总览消息\n   - 嵌入Agent状态指示器(🟢🟡⚪)\n   - 嵌入进度条和任务列表\n   - 消息卡片支持折叠/展开\n\n3. **调整UI布局**\n   - ChatUI占30%宽度(左侧)\n   - 代码编辑器+预览窗口占70%宽度(右侧)\n   - 支持响应式布局和折叠功能\n\n4. **更新相关UML图:**\n   - `/workspace/docs/design/architect.plantuml` - 更新组件架构\n   - `/workspace/docs/design/class_diagram.plantuml` - 更新类图\n   - `/workspace/docs/design/ui_navigation.plantuml` - 更新UI导航图\n   - `/workspace/docs/design/system_design.md` - 更新系统设计文档\n\n5. **WebSocket消息结构优化**\n   - 定义新的消息类型:agent_message, task_overview\n   - 在消息中包含status, progress, tasks等字段\n\n**输出:**\n更新后的设计文档和UML图文件",
+        "task_type": "general",
+        "code": "",
+        "result": "",
+        "is_success": false,
+        "is_finished": true,
+        "assignee": "Bob",
+        "start_at": 1762515713.5689025,
+        "end_at": 1762516049.1221395
       }
     }
   },
@@ -50,7 +63,17 @@
     "13": 1,
     "14": 1,
     "15": 1,
-    "16": 1
+    "16": 1,
+    "17": 1,
+    "19": 1,
+    "18": 1,
+    "20": 1,
+    "21": 1,
+    "23": 1,
+    "22": 1,
+    "24": 1,
+    "25": 1,
+    "26": 1
   },
   "preview_servers": {},
   "preview_server": null,

@@ -61,18 +61,19 @@
 - 白名单机制: 限制可执行命令和可访问文件
 - 超时自动清理机制
 
-#### 挑战4: 实时流式输出
+#### 挑战4: 实时流式输出和状态同步
 **解决方案**:
 - WebSocket双向通信
 - LLM流式API + Server-Sent Events (SSE)
 - 前端增量渲染，避免重绘整个界面
 - 消息队列缓冲，防止消息丢失
+- **ChatUI整合Agent状态和任务进度**，统一展示界面
 
 ### 1.3 MVP阶段功能范围
 
 **Phase 1 (MVP核心)**:
 - ✅ 用户认证和会话管理
-- ✅ 基础聊天界面和流式输出
+- ✅ 基础聊天界面和流式输出（整合Agent状态和任务进度）
 - ✅ Mike(协调者) + Alex(工程师)两个核心Agent
 - ✅ 前端网页开发能力(React/Next.js)
 - ✅ 代码编辑器和文件管理
@@ -102,67 +103,124 @@
 2. 点击"开始使用"按钮
 3. 注册/登录(支持邮箱或OAuth)
 4. 进入Dashboard，看到欢迎引导
-5. 点击"新建会话"进入聊天界面
+5. 点击"新建会话"进入聊天工作区
 6. 输入需求: "创建一个个人作品集网站"
-7. Mike Agent分析需求并制定任务计划
-8. Alex Agent开始生成代码
-9. 用户在代码编辑器中查看生成的文件
+7. Mike Agent分析需求并制定任务计划（在ChatUI中显示任务总览）
+8. Alex Agent开始生成代码（ChatUI显示Agent工作状态和进度）
+9. 用户在代码编辑器中查看生成的文件（占据70%屏幕空间）
 10. 点击"预览"查看实时效果
 11. 满意后点击"部署"发布到线上
 
 #### 流程2: 迭代修改现有项目
 1. 用户从Dashboard选择已有项目
-2. 进入会话，查看历史对话和文件
+2. 进入会话，ChatUI显示历史对话和当前状态
 3. 输入修改需求: "把导航栏改成深色主题"
-4. Alex Agent理解上下文并修改相关文件
+4. Alex Agent理解上下文并修改相关文件（状态实时显示在ChatUI）
 5. 用户在预览中实时看到变化
 6. 确认后提交到GitHub
 
 #### 流程3: 复杂需求多Agent协作
 1. 用户输入: "开发一个带后端的博客系统"
-2. Mike Agent识别为复杂任务，分配给多个Agent:
+2. Mike Agent识别为复杂任务，分配给多个Agent
+3. ChatUI显示任务总览卡片，包含:
    - Emma: 分析需求，创建功能清单
    - Bob: 设计系统架构和数据库模型
    - Alex: 实现前后端代码
-3. 用户在任务面板中查看各Agent的进度
-4. 每个Agent完成后发送通知
-5. 用户可随时介入修改或提供反馈
+4. 每个Agent的工作消息包含状态指示器和进度条
+5. 用户可随时在ChatUI中查看整体进度
+6. 每个Agent完成后发送完成消息
+7. 用户可随时介入修改或提供反馈
 
 ### 2.2 UI交互细节
 
-#### 聊天界面
-- **输入框**: 
-  - 支持多行输入(Shift+Enter换行)
-  - 文件拖拽上传
-  - @提及特定Agent
-  - 快捷命令(如/deploy, /preview)
-- **消息展示**:
-  - 用户消息右对齐(蓝色气泡)
-  - Agent消息左对齐(灰色气泡)
-  - 代码块语法高亮
-  - 思考过程可折叠展示
-  - 流式输出逐字显示
+#### ChatUI（整合版）- 占据30%屏幕宽度
+**核心功能整合**:
+- **对话消息流**: 用户输入和Agent回复
+- **Agent状态展示**: 嵌入在消息卡片中
+- **任务进度显示**: 进度条和百分比
+- **工作流可视化**: 可折叠的任务列表
+- **输入框**: 支持多行、文件上传、@提及
 
-#### 代码编辑器
-- **文件树**: 左侧边栏，支持展开/折叠
-- **编辑区**: 中间主区域，多标签页
-- **终端**: 底部可折叠，显示命令执行结果
-- **快捷操作**:
-  - Cmd/Ctrl + S: 保存文件
-  - Cmd/Ctrl + P: 快速打开文件
-  - Cmd/Ctrl + /: 注释代码
+**消息类型**:
 
-#### 预览面板
+1. **普通对话消息**
+```typescript
+{
+  type: 'message',
+  role: 'user' | 'assistant',
+  content: string,
+  timestamp: datetime
+}
+```
+
+2. **Agent工作消息**（整合状态）
+```typescript
+{
+  type: 'agent_message',
+  agent: 'Mike' | 'Emma' | 'Bob' | 'Alex' | 'David' | 'Iris',
+  status: 'working' | 'waiting' | 'completed' | 'failed',
+  content: string,
+  progress?: number,  // 0-100
+  tasks?: Task[],
+  timestamp: datetime
+}
+```
+
+3. **任务总览消息**（Mike发送）
+```typescript
+{
+  type: 'task_overview',
+  agent: 'Mike',
+  overall_progress: number,  // 0-100
+  tasks: [
+    {
+      task_id: string,
+      description: string,
+      assignee: string,
+      status: 'pending' | 'in_progress' | 'completed',
+      progress: number
+    }
+  ],
+  timestamp: datetime
+}
+```
+
+**交互特性**:
+- **状态指示器**: 
+  - 🟢 Working (动画脉冲)
+  - ⏸️ Waiting (灰色)
+  - ✅ Completed (绿色勾选)
+  - ❌ Failed (红色叉号)
+- **进度条**: 嵌入Agent消息卡片，实时更新
+- **任务列表**: 可折叠展开，点击查看详情
+- **折叠功能**: 支持折叠ChatUI以最大化编辑预览空间
+- **流式输出**: Agent回复逐字显示，提升体验
+
+**输入框功能**:
+- 支持多行输入(Shift+Enter换行)
+- 文件拖拽上传
+- @提及特定Agent
+- 快捷命令(如/deploy, /preview, /help)
+
+#### 代码编辑器 + 预览区域 - 占据70%屏幕宽度
+**布局**:
+- 上方: 文件树（可折叠）
+- 中间: Monaco编辑器（多标签页）
+- 下方: 终端（可折叠）
+- 右侧: 实时预览面板（可切换设备视图）
+
+**编辑器功能**:
+- 语法高亮和自动补全
+- 多文件标签页
+- 代码格式化
+- 错误提示和修复建议
+
+**预览面板功能**:
 - **响应式视图**: 桌面/平板/手机切换
 - **实时刷新**: 代码修改后自动更新
 - **控制台**: 显示JavaScript错误和日志
 - **网络面板**: 查看API请求(开发模式)
-
-#### 任务面板
-- **任务列表**: 显示当前会话所有任务
-- **状态指示**: Pending/In Progress/Completed/Failed
-- **依赖关系**: 可视化任务依赖图
-- **Agent头像**: 显示任务负责人
+- **全屏模式**: 支持全屏预览和部署
 
 ---
 
@@ -174,23 +232,29 @@
 
 #### 前端层 (Frontend Layer)
 - Web UI: 主应用入口
-- Chat Interface: 聊天交互组件
+- **Chat Interface (整合版)**: 
+  - 对话消息流
+  - Agent状态展示
+  - 任务进度显示
+  - 输入框
+  - 工作流可视化
+  - **占据30%屏幕宽度，支持折叠**
 - Code Editor: Monaco编辑器集成
 - File Manager: 文件树和操作
 - Preview Panel: 实时预览
-- Task Dashboard: 任务管理面板
+- **布局**: ChatUI (30%) | Editor+Preview (70%)
 
 #### API网关层 (API Gateway Layer)
 - FastAPI Gateway: RESTful API入口
-- WebSocket Server: 实时双向通信
+- WebSocket Server: 实时双向通信（支持流式输出和状态广播）
 - Authentication Middleware: 认证和授权
 
 #### Agent编排层 (Agent Orchestration Layer)
 - Agent Manager: Agent生命周期管理
-- Task Scheduler: 任务调度和依赖解析
-- Message Router: 消息路由和广播
+- Task Scheduler: 任务调度和依赖解析（实时广播任务状态更新）
+- Message Router: 消息路由和广播（发送到WebSocket）
 - Agent Pool: 
-  - Mike Agent (团队负责人)
+  - Mike Agent (团队负责人) - 发送任务总览消息
   - Emma Agent (产品经理)
   - Bob Agent (架构师)
   - Alex Agent (工程师)
@@ -202,7 +266,7 @@
 - Tool Executor: 工具执行引擎
 - Code Sandbox: 代码沙箱
 - Session Manager: 会话管理
-- Context Store: 上下文存储
+- Context Store: 上下文存储（包含当前任务计划）
 
 #### 工具集成层 (Tool & Integration Layer)
 - Editor Tool: 文件读写
@@ -226,19 +290,26 @@
 
 ### 3.2 关键设计决策
 
-#### 决策1: 为什么选择FastAPI而非Flask/Django?
+#### 决策1: 为什么整合TaskDashboard到ChatUI?
+- **减少UI碎片化**: 用户不需要在多个面板间切换
+- **提升空间利用**: 为代码编辑器和预览预留70%屏幕空间
+- **统一交互模式**: Agent状态、任务进度、对话消息统一展示
+- **简化信息架构**: 所有Agent相关信息集中在一个界面
+- **支持折叠**: ChatUI可折叠以最大化编辑预览空间
+
+#### 决策2: 为什么选择FastAPI而非Flask/Django?
 - **性能**: 基于Starlette和Pydantic，异步性能优秀
 - **类型安全**: 原生支持类型提示，减少运行时错误
 - **文档**: 自动生成OpenAPI文档，前后端协作更高效
 - **WebSocket**: 原生支持，无需额外插件
 
-#### 决策2: 为什么自研Agent框架而非直接用LangChain?
+#### 决策3: 为什么自研Agent框架而非直接用LangChain?
 - **灵活性**: 完全控制Agent行为和工具集成
 - **性能**: 避免LangChain的抽象开销
-- **定制化**: 针对MGX场景优化，如任务依赖管理
+- **定制化**: 针对MGX场景优化，如任务依赖管理和实时状态广播
 - **学习成本**: 团队可以深入理解Agent机制
 
-#### 决策3: 为什么用Docker而非VM或直接执行?
+#### 决策4: 为什么用Docker而非VM或直接执行?
 - **安全**: 容器级别隔离，限制资源访问
 - **轻量**: 启动快，资源占用少
 - **一致性**: 开发、测试、生产环境一致
@@ -259,10 +330,13 @@
   - `think(context: Context) -> Thought`: 思考过程
   - `act(action: Action) -> ActionResult`: 执行动作
 
-- `MikeAgent`, `EmmaAgent`, `BobAgent`, `AlexAgent`, `DavidAgent`, `IrisAgent`: 具体Agent实现
+- `MikeAgent`: 团队负责人
+  - `send_task_overview(session_id: str, tasks: List[Task]) -> None`: 发送任务总览到ChatUI
 
-#### 消息系统
-- `Message`: 消息实体
+- `EmmaAgent`, `BobAgent`, `AlexAgent`, `DavidAgent`, `IrisAgent`: 具体Agent实现
+
+#### 消息系统（扩展）
+- `Message`: 基础消息实体
   - `message_id: str`
   - `sender: str`
   - `receiver: str`
@@ -270,11 +344,26 @@
   - `message_type: MessageType`
   - `timestamp: datetime`
 
+- `AgentMessage`: Agent工作消息（新增）
+  - `agent: str`
+  - `status: AgentStatus` (working/waiting/completed/failed)
+  - `progress: Optional[float]` (0-100)
+  - `tasks: Optional[List[Task]]`
+  - `create_working_message()`: 创建工作中消息
+  - `create_completed_message()`: 创建完成消息
+
+- `TaskOverviewMessage`: 任务总览消息（新增）
+  - `agent: str = "Mike"`
+  - `overall_progress: float`
+  - `tasks: List[Task]`
+  - `update_progress()`: 更新整体进度
+
 - `MessageRouter`: 消息路由器
   - `route_message(message: Message) -> None`
   - `broadcast_message(message: Message, agents: List[str]) -> None`
+  - `send_to_websocket(session_id: str, message: Message) -> None`: 发送到WebSocket
 
-#### 任务管理
+#### 任务管理（增强）
 - `Task`: 任务实体
   - `task_id: str`
   - `task_type: str`
@@ -282,11 +371,18 @@
   - `assignee: str`
   - `dependencies: List[str]`
   - `status: TaskStatus`
+  - `progress: float` (新增)
+  - `update_progress(progress: float) -> None`: 更新进度
 
 - `TaskScheduler`: 任务调度器
   - `schedule_task(task: Task) -> None`
   - `get_next_task() -> Optional[Task]`
+  - `update_task_progress(task_id: str, progress: float) -> None`: 更新任务进度
+  - `broadcast_task_update(session_id: str) -> None`: 广播任务更新到ChatUI
   - `resolve_dependencies(task: Task) -> bool`
+
+- `TaskPlan`: 任务计划
+  - `calculate_overall_progress() -> float`: 计算整体进度
 
 #### LLM服务
 - `LLMService`: LLM统一接口
@@ -307,6 +403,13 @@
 - `ToolExecutor`: 工具执行器
   - `register_tool(tool: Tool) -> None`
   - `execute_tool(tool_name: str, params: Dict) -> ToolResult`
+
+#### WebSocket服务（增强）
+- `WebSocketServer`: WebSocket服务器
+  - `connect(session_id: str, websocket: WebSocket) -> None`
+  - `disconnect(session_id: str) -> None`
+  - `send_to_session(session_id: str, message: Message) -> None`
+  - `stream_agent_response(session_id: str, chunks: Iterator[str]) -> None`: 流式输出
 
 ### 4.2 关键API接口
 
@@ -356,7 +459,8 @@ Output: {
   "context": {
     "working_directory": "string",
     "file_tree": {},
-    "variables": {}
+    "variables": {},
+    "current_task_plan": {}
   }
 }
 ```
@@ -380,11 +484,51 @@ Client -> Server: {
   "type": "message",
   "content": "string"
 }
-Server -> Client: {
-  "type": "agent_response",
-  "agent": "Mike",
+
+Server -> Client (普通消息): {
+  "type": "message",
+  "role": "assistant",
   "content": "string",
-  "is_streaming": true
+  "timestamp": "datetime"
+}
+
+Server -> Client (Agent工作消息): {
+  "type": "agent_message",
+  "agent": "Alex",
+  "status": "working",
+  "content": "正在生成代码...",
+  "progress": 45.5,
+  "timestamp": "datetime"
+}
+
+Server -> Client (任务总览): {
+  "type": "task_overview",
+  "agent": "Mike",
+  "overall_progress": 60.0,
+  "tasks": [
+    {
+      "task_id": "task-1",
+      "description": "需求分析",
+      "assignee": "Emma",
+      "status": "completed",
+      "progress": 100
+    },
+    {
+      "task_id": "task-2",
+      "description": "代码生成",
+      "assignee": "Alex",
+      "status": "in_progress",
+      "progress": 45.5
+    }
+  ],
+  "timestamp": "datetime"
+}
+
+Server -> Client (流式输出): {
+  "type": "stream_chunk",
+  "agent": "Alex",
+  "chunk": "部分内容",
+  "is_final": false
 }
 ```
 
@@ -475,35 +619,48 @@ Output: {
 7. LLM Service -> OpenAI API: 调用GPT-4
 8. OpenAI API -> LLM Service: 返回任务计划
 9. Mike Agent -> Agent Manager: create_task_plan()
-10. Agent Manager -> WebSocket Server: 发送任务计划
-11. WebSocket Server -> Web UI: 显示任务计划
+10. **Mike Agent -> WebSocket Server: 发送TaskOverviewMessage**
+11. **WebSocket Server -> ChatUI: 显示任务总览卡片**
 
 #### 阶段3: 架构设计任务执行
 1. Agent Manager -> Bob Agent: assign_task(task-2)
-2. Bob Agent -> Tool Executor: execute_tool("Editor.read")
-3. Tool Executor -> Editor Tool: read_file("prd.md")
-4. Editor Tool -> Bob Agent: 返回PRD内容
-5. Bob Agent -> LLM Service: generate(架构设计prompt)
-6. LLM Service -> Anthropic API: 调用Claude
-7. Anthropic API -> Bob Agent: 返回架构设计
-8. Bob Agent -> Tool Executor: execute_tool("Editor.write")
-9. Tool Executor -> Editor Tool: write_file("architecture.md")
-10. Bob Agent -> Agent Manager: task_completed()
-11. Agent Manager -> WebSocket Server: 通知完成
+2. **Bob Agent -> WebSocket Server: 发送AgentMessage(status='working')**
+3. **ChatUI: 显示Bob工作状态和进度条**
+4. Bob Agent -> Tool Executor: execute_tool("Editor.read")
+5. Tool Executor -> Editor Tool: read_file("prd.md")
+6. Editor Tool -> Bob Agent: 返回PRD内容
+7. Bob Agent -> LLM Service: generate(架构设计prompt)
+8. LLM Service -> Anthropic API: 调用Claude
+9. **Bob Agent -> WebSocket Server: 更新进度(progress=50)**
+10. **ChatUI: 更新进度条到50%**
+11. Anthropic API -> Bob Agent: 返回架构设计
+12. Bob Agent -> Tool Executor: execute_tool("Editor.write")
+13. Tool Executor -> Editor Tool: write_file("architecture.md")
+14. **Bob Agent -> WebSocket Server: 发送AgentMessage(status='completed', progress=100)**
+15. **ChatUI: 显示Bob完成状态✅**
+16. Bob Agent -> Agent Manager: task_completed()
+17. **Agent Manager -> WebSocket Server: 更新TaskOverview(overall_progress=33)**
 
 #### 阶段4: 代码实现任务执行
 1. Agent Manager -> Alex Agent: assign_task(task-3)
-2. Alex Agent -> Tool Executor: execute_tool("Editor.read")
-3. Alex Agent -> LLM Service: generate(代码生成prompt)
-4. LLM Service -> Alex Agent: 返回代码
-5. 循环: 为每个组件生成代码
+2. **Alex Agent -> WebSocket Server: 发送AgentMessage(status='working')**
+3. Alex Agent -> Tool Executor: execute_tool("Editor.read")
+4. Alex Agent -> LLM Service: generate(代码生成prompt)
+5. LLM Service -> Alex Agent: 返回代码
+6. 循环: 为每个组件生成代码
    - Alex Agent -> LLM Service: generate_code()
+   - **Alex Agent -> WebSocket Server: 更新进度(progress=20, 40, 60...)**
+   - **ChatUI: 实时更新进度条**
    - Alex Agent -> Tool Executor: execute_tool("Editor.write")
-6. Alex Agent -> Tool Executor: execute_tool("Terminal.run", "npm install")
-7. Tool Executor -> Code Sandbox: execute_command()
-8. Code Sandbox -> Tool Executor: 返回执行结果
-9. Alex Agent -> Tool Executor: execute_tool("Terminal.run", "npm run build")
-10. Alex Agent -> Agent Manager: task_completed()
+7. Alex Agent -> Tool Executor: execute_tool("Terminal.run", "npm install")
+8. Tool Executor -> Code Sandbox: execute_command()
+9. Code Sandbox -> Tool Executor: 返回执行结果
+10. **Alex Agent -> WebSocket Server: 更新进度(progress=80)**
+11. Alex Agent -> Tool Executor: execute_tool("Terminal.run", "npm run build")
+12. **Alex Agent -> WebSocket Server: 发送AgentMessage(status='completed', progress=100)**
+13. **ChatUI: 显示Alex完成状态✅**
+14. Alex Agent -> Agent Manager: task_completed()
+15. **Agent Manager -> WebSocket Server: 更新TaskOverview(overall_progress=100)**
 
 #### 阶段5: 预览和部署
 1. 用户点击"预览"
@@ -511,17 +668,20 @@ Output: {
 3. API Gateway -> Session Manager: get_session_files()
 4. Session Manager -> Database: SELECT files
 5. API Gateway -> Web UI: 返回文件列表
-6. Web UI: 渲染预览
+6. Web UI: 渲染预览（占据70%屏幕空间）
 
 7. 用户点击"部署"
 8. Web UI -> API Gateway: POST /api/deploy
 9. API Gateway -> Agent Manager: deploy_application()
 10. Agent Manager -> Alex Agent: handle_deployment()
-11. Alex Agent -> Tool Executor: execute_tool("Git.push")
-12. Alex Agent -> Tool Executor: execute_tool("Deploy.vercel")
-13. Tool Executor -> Alex Agent: 返回部署URL
-14. Alex Agent -> WebSocket Server: 发送部署信息
-15. WebSocket Server -> Web UI: 显示部署链接
+11. **Alex Agent -> WebSocket Server: 发送AgentMessage(status='working', content='正在部署...')**
+12. Alex Agent -> Tool Executor: execute_tool("Git.push")
+13. Alex Agent -> Tool Executor: execute_tool("Deploy.vercel")
+14. Tool Executor -> Alex Agent: 返回部署URL
+15. **Alex Agent -> WebSocket Server: 发送AgentMessage(status='completed', content='部署成功')**
+16. **ChatUI: 显示部署链接**
+17. Alex Agent -> WebSocket Server: 发送部署信息
+18. WebSocket Server -> Web UI: 显示部署链接
 
 #### 阶段6: 上下文持久化
 1. Agent Manager -> Session Manager: update_session_context()
@@ -535,6 +695,8 @@ Output: {
 #### Agent间通信机制
 - 所有Agent通过Message Router进行通信
 - 支持点对点消息和广播消息
+- **Agent工作状态通过WebSocket实时推送到ChatUI**
+- **任务进度更新触发TaskOverview刷新**
 - 消息带有优先级，确保关键消息优先处理
 - 消息持久化到数据库，支持重放和审计
 
@@ -547,8 +709,14 @@ Output: {
 #### LLM调用策略
 - 优先使用配置的默认模型
 - 失败时自动fallback到备用模型
-- 支持流式输出，提升用户体验
+- **支持流式输出，通过WebSocket推送到ChatUI**
 - 记录token使用量和成本
+
+#### 实时状态同步机制（新增）
+- **Agent状态变化**: Agent -> WebSocket -> ChatUI
+- **任务进度更新**: TaskScheduler -> WebSocket -> ChatUI
+- **流式输出**: LLM -> Agent -> WebSocket -> ChatUI
+- **消息类型**: message, agent_message, task_overview, stream_chunk
 
 ---
 
@@ -594,6 +762,7 @@ Output: {
 - assignee: varchar(50)
 - status: varchar(20)
 - priority: integer
+- **progress: float** (新增)
 - created_at: timestamp
 - completed_at: timestamp
 - dependencies: text[]
@@ -628,6 +797,7 @@ Output: {
 - started_at: timestamp
 - completed_at: timestamp
 - status: varchar(20)
+- **progress: float** (新增)
 - input_data: jsonb
 - output_data: jsonb
 - error_message: text
@@ -706,31 +876,34 @@ Output: {
   - 使用统计
 
 #### Level 2: 核心工作区
-- **Chat Interface**: 主要工作空间
-  - 消息历史
-  - 输入框
-  - Agent指示器
-  - 文件附件
+- **Chat Workspace**: 主要工作空间
+  - **布局**: [ChatUI 30%] [Editor+Preview 70%]
   
-  **子面板** (Level 3):
-  - Task Panel: 任务列表和状态
-  - Code Editor: 代码编辑器
-  - File Manager: 文件树管理
+  **Chat Interface (整合版)**:
+  - 对话消息流
+  - Agent状态指示器（嵌入消息卡片）
+  - 任务进度条（嵌入Agent消息）
+  - 任务列表（可折叠展开）
+  - 输入框
+  - 支持折叠以最大化编辑预览空间
+  
+  **Editor & Preview Area**:
+  - Code Editor (Monaco)
+  - File Tree
+  - Terminal
+  - Live Preview
+  - Device selector (响应式视图)
 
-- **Preview & Deploy**: 预览和部署
+- **Preview & Deploy**: 全屏预览和部署
   - 实时预览
   - 响应式视图
   - 控制台日志
-  
-  **子面板** (Level 3):
-  - Deploy Options: 平台选择(Vercel/Netlify/GitHub Pages)
+  - 部署选项 (Vercel/Netlify/GitHub Pages)
 
 - **Projects**: 项目管理
   - 项目列表
   - 搜索和筛选
-  
-  **子面板** (Level 3):
-  - Project Detail: 项目详情、会话、部署记录
+  - 项目详情、会话、部署记录
 
 - **Settings**: 设置页面
   - 用户资料
@@ -739,17 +912,19 @@ Output: {
   - 账单信息
 
 ### 导航原则
-1. **最大深度3-4层**: 避免用户迷失
+1. **最大深度2层**: 避免用户迷失（优化后）
 2. **高频功能前置**: 聊天、预览、部署一键可达
 3. **明确返回路径**: 每个页面都有清晰的返回按钮
 4. **快捷导航**: 顶部导航栏始终可见
 5. **状态保持**: 切换页面时保持工作状态
+6. **空间优化**: ChatUI占30%，Editor+Preview占70%
 
 ### 快捷操作
 - 从任何页面可以快速返回Dashboard
-- 从聊天界面可以直接跳转到预览/部署
+- 从聊天工作区可以直接跳转到全屏预览/部署
 - 从项目列表可以直接打开会话
 - 全局搜索功能(Cmd/Ctrl + K)
+- ChatUI折叠快捷键(Cmd/Ctrl + B)
 
 ---
 
@@ -792,6 +967,13 @@ Output: {
   - David的数据分析能力(支持哪些数据格式和可视化库)?
   - Iris的网络爬虫能力(如何避免违反网站ToS)?
 
+#### 6. ChatUI折叠和响应式设计
+- **问题**: ChatUI折叠后的最小宽度?
+- **待决策**:
+  - 折叠后是否只显示输入框?
+  - 移动端如何处理30/70布局?
+  - 是否支持拖拽调整比例?
+
 ### 8.2 需要用户反馈的产品决策
 
 #### 1. 定价模型
@@ -830,6 +1012,10 @@ Output: {
 - **缓解**: 读写分离, 索引优化, 缓存策略
 - **监控**: 慢查询日志, 数据库性能指标
 
+#### 风险5: ChatUI信息过载
+- **缓解**: 消息折叠、分页、搜索功能
+- **监控**: 用户交互数据, 优化信息展示
+
 ---
 
 ## 9. 后续迭代计划
@@ -838,8 +1024,14 @@ Output: {
 - ✅ 基础架构搭建
 - ✅ 用户认证和会话管理
 - ✅ Mike + Alex Agent实现
+- ✅ **ChatUI（整合版）实现**
+  - 对话消息流
+  - Agent状态展示
+  - 任务进度显示
+  - 支持折叠
 - ✅ 前端网页开发能力
 - ✅ 基础预览和GitHub集成
+- ✅ **WebSocket实时状态同步**
 
 ### Phase 2: 功能扩展 (4-6周)
 - Emma + Bob Agent实现
@@ -847,6 +1039,10 @@ Output: {
 - 多模型切换
 - 部署到Vercel/Netlify
 - 项目模板库
+- **ChatUI高级功能**:
+  - 消息搜索
+  - 历史对话导出
+  - 自定义主题
 
 ### Phase 3: 高级功能 (6-8周)
 - David + Iris Agent实现
@@ -854,6 +1050,7 @@ Output: {
 - 协作功能
 - 性能优化和监控
 - 企业版功能
+- **响应式布局优化**
 
 ### Phase 4: 生态建设 (持续)
 - 插件系统
@@ -871,17 +1068,28 @@ Output: {
 - LLM集成方案和工具系统
 - 数据库设计和API接口规范
 - 完整的用户交互流程和程序调用流程
+- **优化的UI布局: ChatUI(30%) | Editor+Preview(70%)**
 
 **核心优势**:
 1. **模块化设计**: 各层次职责清晰，易于扩展和维护
 2. **异步架构**: 高性能，支持大规模并发
 3. **安全隔离**: Docker沙箱确保代码执行安全
 4. **灵活可扩展**: 支持多模型、多工具、多部署平台
+5. **统一交互**: ChatUI整合Agent状态和任务进度，提升用户体验
+6. **空间优化**: 为代码编辑和预览预留70%屏幕空间
 
 **技术亮点**:
 - 自研多Agent协作框架
 - 统一的LLM服务抽象层
-- 实时流式输出
+- 实时流式输出和状态同步
 - 完善的上下文管理和记忆机制
+- **ChatUI整合设计，减少UI碎片化**
+
+**架构优化**:
+- 删除独立的TaskDashboard组件
+- 将Agent状态、任务进度整合到ChatUI
+- 扩展消息类型支持AgentMessage和TaskOverviewMessage
+- 增强WebSocket服务支持实时状态广播
+- 优化UI布局，提升空间利用率
 
 该设计方案在满足MVP核心功能的同时，为后续迭代预留了充分的扩展空间。

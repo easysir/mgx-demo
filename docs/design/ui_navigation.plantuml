@@ -24,42 +24,60 @@ state "Dashboard" as Dashboard {
     Overview : - Usage stats
 }
 
-state "Chat Interface" as Chat {
-    [*] --> ChatView
-    ChatView : - Message history
-    ChatView : - Input box
-    ChatView : - Agent indicators
-    ChatView : - File attachments
+state "Chat Workspace" as ChatWorkspace {
+    [*] --> WorkspaceView
+    WorkspaceView : - Chat Interface (30%)
+    WorkspaceView : - Code Editor + Preview (70%)
     
-    ChatView --> TaskPanel : View tasks
-    ChatView --> CodeEditor : Edit code
-    ChatView --> FileManager : Manage files
-    
-    state "Task Panel" as TaskPanel {
-        [*] --> TaskList
-        TaskList : - Current tasks
-        TaskList : - Task status
-        TaskList : - Dependencies
+    state "Chat Interface (整合版)" as ChatInterface {
+        [*] --> ChatView
+        ChatView : - Message history
+        ChatView : - Agent status indicators
+        ChatView : - Task progress display
+        ChatView : - Input box
+        ChatView : - File attachments
+        ChatView : - Collapsible sidebar
+        
+        note right of ChatView
+            整合功能:
+            1. 对话消息流
+            2. Agent工作状态
+            3. 任务进度条
+            4. 工作流可视化
+            5. 支持折叠
+        end note
     }
     
-    state "Code Editor" as CodeEditor {
-        [*] --> EditorView
-        EditorView : - Syntax highlighting
-        EditorView : - File tabs
-        EditorView : - Terminal
+    state "Editor & Preview Area" as EditorPreview {
+        [*] --> SplitView
+        SplitView : - Code Editor (Monaco)
+        SplitView : - File Tree
+        SplitView : - Terminal
+        SplitView : - Live Preview
+        SplitView : - Responsive views
+        
+        state "Code Editor" as CodeEditor {
+            [*] --> EditorView
+            EditorView : - Syntax highlighting
+            EditorView : - File tabs
+            EditorView : - Auto-completion
+        }
+        
+        state "Preview Panel" as PreviewPanel {
+            [*] --> PreviewMode
+            PreviewMode : - Live preview
+            PreviewMode : - Device selector
+            PreviewMode : - Console logs
+        }
     }
     
-    state "File Manager" as FileManager {
-        [*] --> FileTree
-        FileTree : - Directory structure
-        FileTree : - File operations
-        FileTree : - Search
-    }
+    WorkspaceView --> ChatInterface : View chat
+    WorkspaceView --> EditorPreview : Edit/Preview
 }
 
 state "Preview & Deploy" as Preview {
     [*] --> PreviewMode
-    PreviewMode : - Live preview
+    PreviewMode : - Full screen preview
     PreviewMode : - Responsive views
     PreviewMode : - Console logs
     
@@ -99,41 +117,51 @@ state "Settings" as Settings {
 Home --> Auth : Sign in/up
 Auth --> Dashboard : Authenticated
 
-Dashboard --> Chat : New session
+Dashboard --> ChatWorkspace : New session
 Dashboard --> Projects : View projects
 Dashboard --> Settings : Settings icon
 
-Chat --> Preview : Preview button
-Chat --> Dashboard : Home button
-Chat --> Projects : Save project
-Chat --> Settings : Settings icon
+ChatWorkspace --> Preview : Full screen preview
+ChatWorkspace --> Dashboard : Home button
+ChatWorkspace --> Projects : Save project
+ChatWorkspace --> Settings : Settings icon
 
-Preview --> Chat : Back to chat
-Preview --> Projects : Save & exit
+Preview --> ChatWorkspace : Back to workspace
 
-Projects --> Chat : Open session
+Projects --> ChatWorkspace : Open session
 Projects --> Dashboard : Back
 Projects --> Settings : Settings icon
 
 Settings --> Dashboard : Back
-Settings --> Chat : Back to session
+Settings --> ChatWorkspace : Back to session
 Settings --> Projects : Back to projects
 
 ' Quick actions from any state
-Chat --> [*] : Logout
+ChatWorkspace --> [*] : Logout
 Dashboard --> [*] : Logout
 Projects --> [*] : Logout
 Settings --> [*] : Logout
 
-note right of Chat
-    Primary workspace
-    Max depth: 3 levels
+note right of ChatWorkspace
+    主工作区布局:
+    [ChatUI 30%] [Editor+Preview 70%]
+    
+    ChatUI可折叠以最大化编辑预览空间
+    Max depth: 2 levels
     Always accessible back button
+end note
+
+note right of ChatInterface
+    整合TaskDashboard功能:
+    - Agent状态嵌入消息卡片
+    - 进度条显示在Agent消息内
+    - 任务列表可折叠展开
+    - 支持流式输出
 end note
 
 note right of Preview
     Quick access to deploy
-    No more than 2 clicks from chat
+    No more than 2 clicks from workspace
 end note
 
 @enduml
