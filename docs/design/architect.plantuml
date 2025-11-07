@@ -8,6 +8,7 @@ skinparam component {
     BackgroundColor<<backend>> LightGreen
     BackgroundColor<<infrastructure>> LightYellow
     BackgroundColor<<external>> LightGray
+    BackgroundColor<<leader>> Orange
 }
 
 package "Frontend Layer" {
@@ -33,12 +34,29 @@ package "API Gateway Layer" {
 }
 
 package "Agent Orchestration Layer" {
+    [Mike Agent\n(Team Leader)] <<leader>> as MikeAgent
+    note right of MikeAgent
+        核心决策者和协调者:
+        - 唯一入口，接收所有用户请求
+        - 需求分析和任务规划
+        - 团队协调和任务分配
+        - 进度监控和质量把关
+        - 审查交付物并反馈用户
+    end note
+    
     [Agent Manager] <<backend>> as AgentManager
+    note right of AgentManager
+        技术支撑层:
+        - 管理Agent实例
+        - 消息路由
+        - 会话状态维护
+        - 执行Mike的指令
+    end note
+    
     [Task Scheduler] <<backend>> as TaskScheduler
     [Message Router] <<backend>> as MessageRouter
     
-    package "Agent Pool" {
-        [Mike Agent\n(Team Lead)] <<backend>> as MikeAgent
+    package "Execution Team" {
         [Emma Agent\n(PM)] <<backend>> as EmmaAgent
         [Bob Agent\n(Architect)] <<backend>> as BobAgent
         [Alex Agent\n(Engineer)] <<backend>> as AlexAgent
@@ -93,20 +111,29 @@ PreviewPanel --> APIGateway : REST
 
 ' API Gateway connections
 APIGateway --> AuthMiddleware
-AuthMiddleware --> AgentManager
+AuthMiddleware --> MikeAgent : 所有请求先到Mike
 WSServer --> MessageRouter
 
-' Agent Orchestration
-AgentManager --> TaskScheduler
-TaskScheduler --> MessageRouter
-MessageRouter --> MikeAgent
-MessageRouter --> EmmaAgent
-MessageRouter --> BobAgent
-MessageRouter --> AlexAgent
-MessageRouter --> DavidAgent
-MessageRouter --> IrisAgent
+' Mike as central coordinator
+MikeAgent --> AgentManager : 使用技术支撑
+MikeAgent --> TaskScheduler : 创建和监控任务
+MikeAgent --> MessageRouter : 发送指令和接收汇报
 
-' Agents to Core Services
+' Agent Manager supports Mike
+AgentManager --> EmmaAgent : 管理实例
+AgentManager --> BobAgent : 管理实例
+AgentManager --> AlexAgent : 管理实例
+AgentManager --> DavidAgent : 管理实例
+AgentManager --> IrisAgent : 管理实例
+
+' Execution team reports to Mike
+EmmaAgent --> MikeAgent : 完成后汇报
+BobAgent --> MikeAgent : 完成后汇报
+AlexAgent --> MikeAgent : 完成后汇报
+DavidAgent --> MikeAgent : 完成后汇报
+IrisAgent --> MikeAgent : 完成后汇报
+
+' All agents use core services
 MikeAgent --> LLMService
 EmmaAgent --> LLMService
 BobAgent --> LLMService
@@ -145,26 +172,6 @@ LLMService --> Anthropic
 LLMService --> Gemini
 GitTool --> GitHub
 SupabaseClient --> Supabase
-
-note right of AgentManager
-  Manages agent lifecycle,
-  routing, and coordination
-end note
-
-note right of TaskScheduler
-  Handles task queue,
-  dependencies, and execution order
-end note
-
-note right of CodeSandbox
-  Isolated execution environment
-  using Docker containers
-end note
-
-note right of LLMService
-  Multi-model support with
-  fallback and load balancing
-end note
 
 note bottom of ChatUI
   新布局占比:

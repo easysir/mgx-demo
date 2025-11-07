@@ -16,12 +16,17 @@ abstract class BaseAgent {
 }
 
 class MikeAgent extends BaseAgent {
-    +team_members: List[BaseAgent]
-    +task_queue: TaskQueue
+    +team_members: Dict[str, BaseAgent]
+    +current_task_plan: TaskPlan
+    +decision_history: List[Decision]
     --
-    +coordinate_task(task: Task): TaskPlan
-    +assign_task(task: Task, agent: BaseAgent): Assignment
-    +monitor_progress(): ProgressReport
+    +analyze_requirement(message: str): RequirementAnalysis
+    +create_task_plan(analysis: RequirementAnalysis): TaskPlan
+    +assign_task_to_agent(agent: str, task: Task): None
+    +on_agent_completed(agent: str, result: Any): NextAction
+    +review_deliverable(result: Any): ReviewResult
+    +monitor_team_progress(): ProgressReport
+    +decide_next_step(context: Context): Decision
     +send_task_overview(session_id: str, tasks: List[Task]): None
 }
 
@@ -31,6 +36,7 @@ class EmmaAgent extends BaseAgent {
     +analyze_requirements(input: str): PRD
     +conduct_research(topic: str): ResearchReport
     +create_prd(requirements: Dict): PRD
+    +report_to_mike(result: Any): None
 }
 
 class BobAgent extends BaseAgent {
@@ -39,6 +45,7 @@ class BobAgent extends BaseAgent {
     +design_architecture(prd: PRD): Architecture
     +create_diagrams(design: Design): List[Diagram]
     +review_design(code: str): DesignReview
+    +report_to_mike(result: Any): None
 }
 
 class AlexAgent extends BaseAgent {
@@ -48,6 +55,7 @@ class AlexAgent extends BaseAgent {
     +write_code(spec: Specification): Code
     +test_code(code: Code): TestResult
     +deploy_application(app: Application): DeploymentResult
+    +report_to_mike(result: Any): None
 }
 
 class DavidAgent extends BaseAgent {
@@ -56,6 +64,7 @@ class DavidAgent extends BaseAgent {
     +analyze_data(data: DataFrame): Analysis
     +create_visualization(data: DataFrame): Visualization
     +generate_insights(analysis: Analysis): Insights
+    +report_to_mike(result: Any): None
 }
 
 class IrisAgent extends BaseAgent {
@@ -65,6 +74,7 @@ class IrisAgent extends BaseAgent {
     +search_web(query: str): SearchResults
     +scrape_website(url: str): ScrapedData
     +deep_research(topic: str): ResearchReport
+    +report_to_mike(result: Any): None
 }
 
 ' Message and Communication
@@ -87,6 +97,7 @@ enum MessageType {
     AGENT_MESSAGE
     TASK_OVERVIEW
     TASK_ASSIGNMENT
+    AGENT_REPORT
     TOOL_EXECUTION
     SYSTEM_NOTIFICATION
 }
@@ -120,7 +131,8 @@ class MessageRouter {
     +routes: Dict[str, BaseAgent]
     +message_queue: Queue[Message]
     --
-    +route_message(message: Message): None
+    +route_to_mike(message: Message): None
+    +route_from_mike(message: Message, target: str): None
     +broadcast_message(message: Message, agents: List[str]): None
     +get_conversation_history(session_id: str): List[Message]
     +send_to_websocket(session_id: str, message: Message): None
@@ -138,6 +150,7 @@ class Task {
     +progress: float
     +created_at: datetime
     +completed_at: Optional[datetime]
+    +created_by: str = "Mike"
     --
     +mark_completed(): None
     +add_dependency(task_id: str): None
@@ -162,6 +175,7 @@ class TaskScheduler {
     +update_task_progress(task_id: str, progress: float): None
     +resolve_dependencies(task: Task): bool
     +broadcast_task_update(session_id: str): None
+    +notify_mike_on_completion(task: Task): None
 }
 
 class TaskPlan {
@@ -170,12 +184,24 @@ class TaskPlan {
     +tasks: List[Task]
     +current_task_index: int
     +overall_progress: float
+    +created_by: str = "Mike"
     --
     +add_task(task: Task): None
     +get_current_task(): Optional[Task]
     +mark_task_completed(task_id: str): None
     +calculate_overall_progress(): float
     +is_completed(): bool
+}
+
+class AgentManager {
+    +agents: Dict[str, BaseAgent]
+    +mike_agent: MikeAgent
+    --
+    +get_agent(agent_name: str): BaseAgent
+    +register_agent(agent: BaseAgent): None
+    +execute_mike_instruction(instruction: Instruction): None
+    +route_message_to_agent(agent_name: str, message: Message): None
+    +notify_mike_completion(agent_name: str, result: Any): None
 }
 
 ' LLM Service
@@ -348,6 +374,7 @@ class APIGateway {
     --
     +register_route(path: str, handler: Callable): None
     +handle_request(request: Request): Response
+    +forward_to_mike(request: Request): Response
 }
 
 class WebSocketServer {
@@ -365,22 +392,36 @@ class WebSocketServer {
 BaseAgent --> LLMService : uses
 BaseAgent --> ToolExecutor : uses
 BaseAgent --> Message : sends/receives
-MikeAgent --> TaskScheduler : manages
-MikeAgent --> TaskOverviewMessage : creates
-TaskScheduler --> Task : schedules
-TaskScheduler --> WebSocketServer : broadcasts updates
-MessageRouter --> BaseAgent : routes to
-MessageRouter --> WebSocketServer : sends to
-SessionManager --> Session : manages
-Session --> Context : contains
-Context --> TaskPlan : contains
-ContextStore --> Context : stores
-LLMService --> LLMProvider : uses
-ToolExecutor --> Tool : executes
-CodeSandbox --> ExecutionResult : produces
-APIGateway --> SessionManager : uses
-WebSocketServer --> MessageRouter : uses
-Message <|-- AgentMessage : extends
-Message <|-- TaskOverviewMessage : extends
+
+MikeAgent --> AgentManager : 使用技术支撑
+MikeAgent --> TaskScheduler : 创建和监控任务
+MikeAgent --> TaskPlan : 创建和管理
+MikeAgent --> TaskOverviewMessage : 创建任务总览
+MikeAgent "1" --> "*" EmmaAgent : 分配任务
+MikeAgent "1" --> "*" BobAgent : 分配任务
+MikeAgent "1" --> "*" AlexAgent : 分配任务
+MikeAgent "1" --> "*" DavidAgent : 分配任务
+MikeAgent "1" --> "*" IrisAgent : 分配任务
+
+AgentManager --> BaseAgent : 管理实例
+TaskScheduler --> Task : 调度
+TaskScheduler --> MikeAgent : 完成时通知
+MessageRouter --> MikeAgent : 路由到Mike
+MessageRouter --> BaseAgent : 从Mike路由
+MessageRouter --> WebSocketServer : 发送到前端
+
+SessionManager --> Session : 管理
+Session --> Context : 包含
+Context --> TaskPlan : 包含
+ContextStore --> Context : 存储
+LLMService --> LLMProvider : 使用
+ToolExecutor --> Tool : 执行
+CodeSandbox --> ExecutionResult : 产生
+
+APIGateway --> MikeAgent : 转发请求
+APIGateway --> SessionManager : 使用
+WebSocketServer --> MessageRouter : 使用
+Message <|-- AgentMessage : 扩展
+Message <|-- TaskOverviewMessage : 扩展
 
 @enduml

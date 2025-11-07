@@ -2,7 +2,7 @@
     "tabs": {
         "00": {
             "tab_id": "00",
-            "cwd": "/workspace",
+            "cwd": "/workspace/docs/design",
             "observer": {
                 "block": "Terminal",
                 "uuid": "4c0123c0-642a-45a3-a84d-ab754191c1e2",

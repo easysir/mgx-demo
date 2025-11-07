@@ -3,207 +3,228 @@
 actor User
 participant "Web UI" as UI
 participant "API Gateway" as API
-participant "WebSocket Server" as WS
-participant "Session Manager" as SM
+participant "WebSocket" as WS
+participant "Mike Agent\n(Team Leader)" as Mike
 participant "Agent Manager" as AM
-participant "Mike Agent" as Mike
+participant "Emma Agent" as Emma
 participant "Bob Agent" as Bob
 participant "Alex Agent" as Alex
 participant "LLM Service" as LLM
 participant "Tool Executor" as TE
-participant "Code Sandbox" as CS
 participant "Database" as DB
 
-== User Session Initialization ==
-User -> UI: Access Platform
+== 阶段1: 会话初始化 ==
+User -> UI: 访问平台
 UI -> API: POST /api/sessions/create
-    note right
-        Input: {
-            "user_id": "string"
-        }
-    end note
-API -> SM: create_session(user_id)
-SM -> DB: INSERT session
-DB --> SM: session_id
-SM --> API: Session
-    note right
-        Output: {
-            "session_id": "uuid",
-            "created_at": "timestamp",
-            "ws_url": "string"
-        }
-    end note
-API --> UI: Session Info
-UI -> WS: Connect WebSocket(session_id)
-WS -> SM: register_connection(session_id)
-WS --> UI: Connection Established
+API -> DB: 创建会话
+DB --> API: session_id
+API --> UI: 返回session_id和ws_url
+UI -> WS: 建立WebSocket连接
+WS --> UI: 连接成功
 
-== User Submits Development Request ==
-User -> UI: "Create a portfolio website"
+== 阶段2: 用户提交需求 (Mike作为唯一入口) ==
+User -> UI: 输入需求\n"创建一个作品集网站"
 UI -> API: POST /api/chat/message
+API -> Mike: 转发用户消息
+note right of Mike
+    Mike是唯一入口
+    所有请求先到Mike
+end note
+
+Mike -> LLM: 分析需求
     note right
         Input: {
-            "session_id": "uuid",
-            "content": "Create a portfolio website",
-            "message_type": "USER_INPUT"
+            "prompt": "分析用户需求...",
+            "model": "gpt-4"
         }
     end note
-API -> SM: get_session(session_id)
-SM --> API: Session with Context
-API -> AM: process_user_request(message, context)
-
-== Agent Orchestration - Task Planning ==
-AM -> Mike: process_message(message)
-Mike -> LLM: generate(prompt, model="gpt-4")
-    note right
-        Prompt: "Analyze this request and create a task plan:
-        User wants to create a portfolio website.
-        Break down into tasks for team members."
-    end note
-LLM --> Mike: Task Plan
+LLM --> Mike: 需求分析结果
     note right
         Output: {
+            "complexity": "medium",
+            "needs_research": false,
+            "needs_architecture": true,
+            "estimated_tasks": [...]
+        }
+    end note
+
+Mike -> Mike: 创建任务计划
+Mike -> WS: 发送TaskOverviewMessage
+    note right
+        {
+            "type": "task_overview",
+            "agent": "Mike",
+            "overall_progress": 0,
             "tasks": [
-                {
-                    "task_id": "task-1",
-                    "assignee": "Emma",
-                    "description": "Create PRD"
-                },
-                {
-                    "task_id": "task-2",
-                    "assignee": "Bob",
-                    "description": "Design architecture",
-                    "dependencies": ["task-1"]
-                },
-                {
-                    "task_id": "task-3",
-                    "assignee": "Alex",
-                    "description": "Implement website",
-                    "dependencies": ["task-2"]
-                }
+                {"id": "task-1", "assignee": "Bob", "description": "设计架构"},
+                {"id": "task-2", "assignee": "Alex", "description": "开发代码"}
             ]
         }
     end note
-Mike -> AM: create_task_plan(tasks)
-AM -> WS: send_message(session_id, "Task plan created")
-WS --> UI: Display Task Plan
+WS --> UI: 显示任务总览
 
-== Task Execution - Architecture Design ==
-AM -> Bob: assign_task(task-2)
-Bob -> TE: execute_tool("Editor.read", {"path": "prd.md"})
-TE --> Bob: PRD Content
-Bob -> LLM: generate(prompt, model="claude-sonnet")
+== 阶段3: Mike分配架构设计任务 ==
+Mike -> AM: 获取Bob实例
+AM --> Mike: Bob Agent实例
+Mike -> Bob: 分配任务\n"设计作品集网站架构"
     note right
-        Prompt: "Based on this PRD, design a system architecture
-        for a portfolio website. Include component diagram,
-        data flow, and tech stack recommendations."
+        Mike决策: 需要先设计架构
     end note
-LLM --> Bob: Architecture Design
-Bob -> TE: execute_tool("Editor.write", params)
+
+Bob -> WS: 发送AgentMessage(status='working')
     note right
-        Input: {
-            "path": "docs/architecture.md",
-            "content": "# System Architecture\n..."
+        {
+            "type": "agent_message",
+            "agent": "Bob",
+            "status": "working",
+            "content": "正在设计系统架构...",
+            "progress": 0
         }
     end note
-TE --> Bob: File Written
-Bob -> AM: task_completed(task-2, outputs)
-AM -> WS: send_message(session_id, "Architecture design completed")
-WS --> UI: Display Architecture Document
+WS --> UI: ChatUI显示Bob工作状态
 
-== Task Execution - Code Implementation ==
-AM -> Alex: assign_task(task-3)
-Alex -> TE: execute_tool("Editor.read", {"path": "docs/architecture.md"})
-TE --> Alex: Architecture Spec
-Alex -> LLM: generate(prompt, model="gpt-4")
+Bob -> TE: execute_tool("Editor.read", "requirements")
+TE --> Bob: 需求内容
+
+Bob -> LLM: 生成架构设计
     note right
-        Prompt: "Implement a portfolio website based on this
-        architecture. Use React, TypeScript, and Tailwind CSS."
+        Input: {
+            "prompt": "设计架构...",
+            "model": "claude-3-sonnet"
+        }
     end note
-LLM --> Alex: Code Generation Plan
+LLM --> Bob: 架构设计方案
 
-loop For each component
-    Alex -> LLM: generate_code(component_spec)
-    LLM --> Alex: Component Code
-    Alex -> TE: execute_tool("Editor.write", params)
+Bob -> WS: 更新进度(progress=50)
+WS --> UI: 更新进度条
+
+Bob -> TE: execute_tool("Editor.write", "architecture.md")
+TE --> Bob: 写入成功
+
+Bob -> WS: 发送AgentMessage(status='completed', progress=100)
+WS --> UI: 显示Bob完成状态✅
+
+Bob -> Mike: 汇报完成\n返回架构设计
+    note right
+        Bob完成后向Mike汇报
+        不是向Agent Manager汇报
+    end note
+
+== 阶段4: Mike评估并分配开发任务 ==
+Mike -> Mike: 评估Bob的架构设计
+    note right
+        Mike审查交付物
+        决定下一步行动
+    end note
+
+Mike -> LLM: 评估架构质量
+LLM --> Mike: 评估结果: 通过
+
+Mike -> WS: 更新TaskOverview(overall_progress=50)
+WS --> UI: 更新整体进度
+
+Mike -> AM: 获取Alex实例
+AM --> Mike: Alex Agent实例
+Mike -> Alex: 分配任务\n"根据架构实现代码"
+    note right
+        Mike决策: 架构通过，开始开发
+    end note
+
+Alex -> WS: 发送AgentMessage(status='working')
+WS --> UI: ChatUI显示Alex工作状态
+
+Alex -> TE: execute_tool("Editor.read", "architecture.md")
+TE --> Alex: 架构文档
+
+loop 为每个组件生成代码
+    Alex -> LLM: 生成组件代码
         note right
             Input: {
-                "path": "src/components/Header.tsx",
-                "content": "import React from 'react';\n..."
+                "prompt": "根据架构生成代码...",
+                "model": "gpt-4"
             }
         end note
-    TE --> Alex: File Written
+    LLM --> Alex: 组件代码
+    
+    Alex -> WS: 更新进度(progress=20, 40, 60...)
+    WS --> UI: 实时更新进度条
+    
+    Alex -> TE: execute_tool("Editor.write", "component.tsx")
+    TE --> Alex: 写入成功
 end
 
-Alex -> TE: execute_tool("Terminal.run", {"cmd": "npm install"})
-TE -> CS: execute_command("npm install")
-CS --> TE: Command Output
+Alex -> TE: execute_tool("Terminal.run", "npm install")
+TE --> Alex: 安装完成
+
+Alex -> WS: 更新进度(progress=80)
+WS --> UI: 更新进度条
+
+Alex -> TE: execute_tool("Terminal.run", "npm run build")
+TE --> Alex: 构建成功
+
+Alex -> WS: 发送AgentMessage(status='completed', progress=100)
+WS --> UI: 显示Alex完成状态✅
+
+Alex -> Mike: 汇报完成\n返回代码和构建结果
     note right
-        Output: {
-            "stdout": "added 1234 packages",
-            "stderr": "",
-            "exit_code": 0
+        Alex完成后向Mike汇报
+    end note
+
+== 阶段5: Mike审查并通知用户 ==
+Mike -> Mike: 审查Alex的代码
+    note right
+        Mike进行最终质量把关
+    end note
+
+Mike -> LLM: 代码审查
+LLM --> Mike: 审查结果: 通过
+
+Mike -> WS: 更新TaskOverview(overall_progress=100)
+WS --> UI: 显示所有任务完成
+
+Mike -> WS: 发送完成消息给用户
+    note right
+        {
+            "type": "message",
+            "role": "assistant",
+            "content": "作品集网站已完成开发，\n可以预览和部署了。"
         }
     end note
-TE --> Alex: Installation Complete
+WS --> UI: 显示Mike的消息
+UI --> User: 展示完成通知
 
-Alex -> TE: execute_tool("Terminal.run", {"cmd": "npm run build"})
-TE -> CS: execute_command("npm run build")
-CS --> TE: Build Output
-TE --> Alex: Build Complete
-
-Alex -> AM: task_completed(task-3, outputs)
-AM -> WS: send_message(session_id, "Website implementation completed")
-WS --> UI: Display Success Message
-
-== Code Preview and Deployment ==
-User -> UI: Click "Preview"
+== 阶段6: 用户预览和部署 ==
+User -> UI: 点击"预览"
 UI -> API: GET /api/preview/{session_id}
-API -> SM: get_session_files(session_id)
-SM -> DB: SELECT files WHERE session_id = ?
-DB --> SM: File List
-SM --> API: Files
-API --> UI: Preview Data
-UI -> UI: Render Preview
+API -> DB: 获取文件列表
+DB --> API: 文件数据
+API --> UI: 返回文件
+UI --> User: 渲染预览
 
-User -> UI: Click "Deploy"
+User -> UI: 点击"部署"
 UI -> API: POST /api/deploy
+API -> Mike: 转发部署请求
     note right
-        Input: {
-            "session_id": "uuid",
-            "platform": "vercel"
-        }
+        部署请求也通过Mike
     end note
-API -> AM: deploy_application(session_id, platform)
-AM -> Alex: handle_deployment(platform)
-Alex -> TE: execute_tool("Git.push", params)
-    note right
-        Input: {
-            "repo_url": "github.com/user/repo",
-            "branch": "main",
-            "files": ["src/*", "package.json"]
-        }
-    end note
-TE --> Alex: Git Push Success
-Alex -> TE: execute_tool("Deploy.vercel", params)
-TE --> Alex: Deployment URL
-    note right
-        Output: {
-            "success": true,
-            "url": "https://portfolio-abc123.vercel.app",
-            "deployment_id": "dpl_xyz"
-        }
-    end note
-Alex -> AM: deployment_completed(url)
-AM -> WS: send_message(session_id, deployment_info)
-WS --> UI: Display Deployment URL
-UI --> User: Show Live Website Link
 
-== Context Persistence ==
-AM -> SM: update_session_context(session_id, context)
-SM -> DB: UPDATE sessions SET context = ? WHERE id = ?
-DB --> SM: Success
-SM -> ContextStore: save_context(session_id, context)
-ContextStore --> SM: Saved
+Mike -> Alex: 分配部署任务
+Alex -> WS: 发送AgentMessage(status='working', content='正在部署...')
+WS --> UI: 显示部署状态
+
+Alex -> TE: execute_tool("Git.push")
+TE --> Alex: 推送成功
+
+Alex -> TE: execute_tool("Deploy.vercel")
+TE --> Alex: 部署URL
+
+Alex -> Mike: 汇报部署完成
+Mike -> WS: 发送部署成功消息\n包含URL
+WS --> UI: 显示部署链接
+UI --> User: 展示部署结果
+
+== 阶段7: 上下文持久化 ==
+Mike -> DB: 保存会话上下文
+DB --> Mike: 保存成功
 
 @enduml
