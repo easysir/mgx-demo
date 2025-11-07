@@ -31,6 +31,12 @@ package "API Gateway Layer" {
     [FastAPI Gateway] <<backend>> as APIGateway
     [WebSocket Server] <<backend>> as WSServer
     [Authentication\nMiddleware] <<backend>> as AuthMiddleware
+    note right of AuthMiddleware
+        修复点3: WebSocket鉴权
+        - JWT验证
+        - Token刷新
+        - 会话验证
+    end note
 }
 
 package "Agent Orchestration Layer" {
@@ -72,6 +78,14 @@ package "Core Services Layer" {
     [Tool Executor] <<backend>> as ToolExecutor
     [Code Sandbox] <<backend>> as CodeSandbox
     [Session Manager] <<backend>> as SessionManager
+    note right of SessionManager
+        修复点1: 完整依赖关系
+        - API Gateway使用
+        - WebSocket使用
+        - 所有Agent使用
+        - Tool Executor使用
+        - Context Store双向
+    end note
     [Context Store] <<backend>> as ContextStore
 }
 
@@ -81,6 +95,13 @@ package "Tool & Integration Layer" {
     [Search Tool] <<backend>> as SearchTool
     [Git Integration] <<backend>> as GitTool
     [Supabase Client] <<backend>> as SupabaseClient
+    [Preview Server] <<backend>> as PreviewServer
+    note right of PreviewServer
+        修复点2: 预览流程
+        - 启动Code Sandbox中的应用
+        - 配置nginx反向代理
+        - 提供预览URL
+    end note
 }
 
 package "Data Layer" {
@@ -110,10 +131,12 @@ ChatUI --> WSServer : WebSocket (实时状态+流式输出)
 CodeEditor --> APIGateway : REST
 FileManager --> APIGateway : REST
 PreviewPanel --> APIGateway : REST
+PreviewPanel --> PreviewServer : 预览URL访问
 
 ' API Gateway connections
-APIGateway --> AuthMiddleware
+APIGateway --> AuthMiddleware : 鉴权
 AuthMiddleware --> MikeAgent : 所有请求到Mike
+WSServer --> AuthMiddleware : WebSocket鉴权
 WSServer --> MessageRouter
 
 ' Mike manages team directly
@@ -161,6 +184,19 @@ AlexAgent --> ToolExecutor
 DavidAgent --> ToolExecutor
 IrisAgent --> ToolExecutor
 
+' Session Manager dependencies (修复点1)
+APIGateway --> SessionManager : 会话管理
+WSServer --> SessionManager : 会话验证
+MikeAgent --> SessionManager : 获取会话
+EmmaAgent --> SessionManager : 获取会话
+BobAgent --> SessionManager : 获取会话
+AlexAgent --> SessionManager : 获取会话
+DavidAgent --> SessionManager : 获取会话
+IrisAgent --> SessionManager : 获取会话
+ToolExecutor --> SessionManager : 获取会话
+LLMService --> SessionManager : 获取会话
+SessionManager <--> ContextStore : 双向同步
+
 ' Core Services connections
 ToolExecutor --> EditorTool
 ToolExecutor --> TerminalTool
@@ -168,9 +204,13 @@ ToolExecutor --> SearchTool
 ToolExecutor --> GitTool
 ToolExecutor --> SupabaseClient
 
-LLMService --> SessionManager
-SessionManager --> ContextStore
-ToolExecutor --> CodeSandbox
+ToolExecutor --> CodeSandbox : 执行代码
+TerminalTool --> CodeSandbox : 运行命令
+
+' Preview Server connections (修复点2)
+PreviewServer --> CodeSandbox : 启动应用
+PreviewServer --> SessionManager : 获取会话文件
+CodeSandbox --> PreviewServer : 应用端口
 
 ' Data Layer connections
 SessionManager --> PostgreSQL

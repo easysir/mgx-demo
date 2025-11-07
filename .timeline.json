@@ -1,5 +1,5 @@
 {
-  "timeline_index": 46,
+  "timeline_index": 54,
   "planner": {
     "Team Leader": {
       "1": {
@@ -13,23 +13,21 @@
         "is_finished": true,
         "assignee": "Bob",
         "start_at": 1762518018.7559595,
-        "end_at": 1762519479.6446912
+        "end_at": 1762520682.091676
       },
-      "current_task_id": "1",
+      "current_task_id": "2",
       "2": {
         "task_id": "2",
-        "dependent_task_ids": [
-          "1"
-        ],
-        "instruction": "基于Emma的PRD文档（/workspace/docs/prd/mgx_mvp_prd.md），设计MGX MVP的完整技术架构，包括：\n\n**后端架构（Agent Server）：**\n1. 多Agent系统架构（Mike、Emma、Bob、Alex、David等角色）\n2. Agent通信机制和任务调度\n3. LLM集成方案（支持多模型）\n4. 工具和命令系统\n5. 会话管理和上下文维护\n6. 代码执行环境\n\n**前端架构：**\n1. 用户交互界面设计\n2. 实时消息展示\n3. 代码编辑器集成\n4. 文件管理系统\n5. 预览和部署功能\n\n**技术选型：**\n- 后端框架和语言\n- 前端框架和UI库\n- 数据库方案\n- 部署方案\n\n输出系统设计文档到：/workspace/docs/design/mgx_mvp_architecture.md",
+        "dependent_task_ids": [],
+        "instruction": "根据用户反馈，更新架构设计文档和UML图，修复以下三个问题：\n\n**问题1：Session Manager 的依赖关系不完整**\n\n当前架构图中 Session Manager 仅被 LLM Service 依赖，这是不准确的。\n\n**需要修改：**\n在 `/workspace/docs/design/architect.plantuml` 中添加以下依赖关系：\n- API Gateway → Session Manager（创建/获取会话）\n- Mike Agent → Session Manager（获取任务计划和进度）\n- Tool Executor → Session Manager（获取工作目录和文件树）\n- WebSocket Server → Session Manager（获取会话状态）\n- Context Store ↔ Session Manager（双向，保存/加载上下文）\n\n**问题2：站点启动和预览流程不明确**\n\n需要在架构图中明确代码执行和预览的完整流程。\n\n**需要添加：**\n1. 在 \"Tool & Integration Layer\" 中添加 Preview Server 组件\n2. 添加以下连接关系：\n   - Preview Server → Code Sandbox（获取开发服务器端口或构建产物）\n   - Preview Server → nginx（设置反向代理）\n   - Preview Panel → Preview Server（获取预览URL）\n\n3. 在 `/workspace/docs/design/sequence_diagram.plantuml` 中添加预览流程：\n```\n== 阶段7: 启动预览 ==\nUser -> UI: 点击\"预览\"按钮\nUI -> API: POST /api/preview/start\nAPI -> Preview Server: 启动预览服务\nPreview Server -> Code Sandbox: 检查开发服务器或构建产物\nCode Sandbox --> Preview Server: 返回端口或构建目录\nPreview Server -> Preview Server: 设置nginx反向代理\nPreview Server --> API: 返回预览URL\nAPI --> UI: 预览URL\nUI -> Preview Panel: 加载预览\nPreview Panel -> nginx: 访问预览URL\nnginx -> Code Sandbox: 反向代理到容器内服务\nCode Sandbox --> nginx: 返回HTML/CSS/JS\nnginx --> Preview Panel: 返回网站内容\nPreview Panel --> User: 显示网站预览\n```\n\n**问题3：WebSocket 连接缺少鉴权**\n\n当前架构中 WebSocket 连接没有鉴权机制，存在安全风险。\n\n**需要添加：**\n1. 在 \"API Gateway Layer\" 中添加 Authentication Middleware 组件\n2. 添加以下连接关系：\n   - API Gateway → Authentication Middleware（所有请求先经过鉴权）\n   - Authentication Middleware → Session Manager（验证会话权限）\n   - WebSocket Server → Authentication Middleware（WebSocket 连接鉴权）\n\n3. 在 `/workspace/docs/design/sequence_diagram.plantuml` 中添加鉴权流程：\n```\n== 阶段0: 用户登录和会话创建 ==\nUser -> UI: 登录\nUI -> API: POST /api/auth/login\nAPI -> Authentication Middleware: 验证用户名密码\nAuthentication Middleware --> API: 返回 access_token\nAPI --> UI: 返回 token\nUI -> API: POST /api/sessions/create\nnote right: Headers: Authorization: Bearer {token}\nAPI -> Authentication Middleware: 验证 token\nAuthentication Middleware -> Session Manager: 创建会话\nSession Manager --> API: 返回 session_id\nAPI --> UI: 返回 session_id 和 ws_url\n\n== 阶段1: WebSocket 连接鉴权 ==\nUI -> WS: 建立连接\nnote right: wss://api.mgx.dev/ws/{session_id}?token={token}\nWS -> Authentication Middleware: 验证 token\nAuthentication Middleware -> Session Manager: 验证会话权限\nSession Manager --> Authentication Middleware: 验证通过\nAuthentication Middleware --> WS: 鉴权成功\nWS --> UI: 连接成功\n```\n\n4. 在 `/workspace/docs/design/system_design.md` 中添加\"安全机制\"章节：\n- JWT token 鉴权机制\n- WebSocket 连接鉴权流程\n- Token 刷新机制\n- 会话权限验证\n\n**输出要求：**\n- 增量更新，保持简洁明了\n- 重点突出三个修复点\n- 确保架构图和文档描述一致\n- 添加必要的注释说明新增组件的作用\n\n请开始更新。",
         "task_type": "general",
         "code": "",
         "result": "",
         "is_success": false,
         "is_finished": true,
         "assignee": "Bob",
-        "start_at": 1762503212.9190218,
-        "end_at": 1762515713.5688925
+        "start_at": 1762520682.0916805,
+        "end_at": 1762520847.4840078
       },
       "3": {
         "task_id": "3",
@@ -93,7 +91,15 @@
     "43": 1,
     "44": 1,
     "45": 1,
-    "46": 1
+    "46": 1,
+    "47": 1,
+    "49": 1,
+    "48": 1,
+    "50": 1,
+    "51": 1,
+    "52": 1,
+    "53": 1,
+    "54": 1
   },
   "preview_servers": {},
   "preview_server": null,

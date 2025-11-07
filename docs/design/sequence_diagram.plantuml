@@ -3,36 +3,84 @@
 actor User
 participant "Web UI" as UI
 participant "API Gateway" as API
+participant "Auth Middleware" as Auth
 participant "WebSocket Server" as WS
+participant "Session Manager" as SM
 participant "Mike Agent\n(Team Leader)" as Mike
 participant "Task Scheduler" as TS
 participant "Message Router" as MR
 participant "Bob Agent" as Bob
 participant "Alex Agent" as Alex
-participant "LLM Service" as LLM
 participant "Tool Executor" as TE
-participant "Session Manager" as SM
+participant "Terminal Tool" as TT
+participant "Code Sandbox" as CS
+participant "Preview Server" as PS
+participant "LLM Service" as LLM
 participant "Database" as DB
 
-== 阶段1: 会话初始化 ==
+== 阶段1: 用户认证和会话初始化 (修复点3: 鉴权流程) ==
 User -> UI: 访问平台
+UI -> API: POST /api/auth/login
+    note right
+        Input: {
+            "email": "user@example.com",
+            "password": "***"
+        }
+    end note
+API -> Auth: 验证凭据
+Auth -> DB: 查询用户
+DB --> Auth: 用户信息
+Auth --> API: JWT Token
+    note right
+        Output: {
+            "access_token": "eyJhbGc...",
+            "refresh_token": "eyJhbGc...",
+            "expires_in": 3600
+        }
+    end note
+API --> UI: 返回Token
+
 UI -> API: POST /api/sessions/create
+    note right
+        Headers: {
+            "Authorization": "Bearer eyJhbGc..."
+        }
+    end note
+API -> Auth: 验证JWT
+Auth --> API: 验证通过
 API -> SM: create_session(user_id)
 SM -> DB: INSERT session
 DB --> SM: session_id
 SM --> API: Session对象
 API --> UI: 返回session_id和ws_url
+
 UI -> WS: 建立WebSocket连接
+    note right
+        URL: wss://api/ws/{session_id}?token=eyJhbGc...
+    end note
+WS -> Auth: 验证WebSocket Token
+Auth --> WS: 验证通过
+WS -> SM: register_connection(session_id)
 WS --> UI: 连接成功
 
 == 阶段2: 用户提交需求 (Mike作为唯一入口) ==
 User -> UI: 输入需求\n"创建一个作品集网站"
 UI -> API: POST /api/chat/message
+    note right
+        Headers: {
+            "Authorization": "Bearer eyJhbGc..."
+        }
+        Body: {
+            "session_id": "uuid",
+            "content": "创建一个作品集网站"
+        }
+    end note
+API -> Auth: 验证JWT
+Auth --> API: 验证通过
 API -> Mike: 转发用户消息
-note right of Mike
-    Mike是唯一入口
-    直接管理团队
-end note
+
+Mike -> SM: get_session(session_id)
+SM --> Mike: Session对象
 
 Mike -> LLM: 分析需求
 LLM --> Mike: 需求分析结果
@@ -44,23 +92,18 @@ WS --> UI: ChatUI显示任务总览
 
 == 阶段3: Mike通过Task Scheduler分配架构设计任务 ==
 Mike -> TS: schedule_task(task-2, assignee="Bob")
-note right of TS
-    优化点2:
-    Task Scheduler与所有Agent关联
-end note
-
 TS -> Bob: assign_task(task-2)
-note right of Bob
-    优化点3:
-    所有Agent通过Message Router
-    发送状态到WebSocket
-end note
+
+Bob -> SM: get_session(session_id)
+SM --> Bob: Session对象
 
 Bob -> MR: 发送AgentMessage(status='working')
 MR -> WS: 广播Bob工作状态
 WS --> UI: ChatUI显示Bob工作状态
 
 Bob -> TE: execute_tool("Editor.read", "requirements")
+TE -> SM: get_session_files(session_id)
+SM --> TE: 文件内容
 TE --> Bob: 需求内容
 
 Bob -> LLM: 生成架构设计
@@ -71,6 +114,8 @@ MR -> WS: 广播进度更新
 WS --> UI: 更新进度条
 
 Bob -> TE: execute_tool("Editor.write", "architecture.md")
+TE -> SM: save_file(session_id, path, content)
+SM --> TE: 保存成功
 TE --> Bob: 写入成功
 
 Bob -> MR: 发送AgentMessage(status='completed', progress=100)
@@ -78,11 +123,6 @@ MR -> WS: 广播完成状态
 WS --> UI: 显示Bob完成✅
 
 Bob -> TS: notify_task_completed(task-2)
-note right of TS
-    Task Scheduler接收完成通知
-    通知Mike并分配下一个任务
-end note
-
 TS -> Mike: on_task_completed(task-2, Bob, result)
 
 == 阶段4: Mike评估并分配开发任务 ==
@@ -97,11 +137,16 @@ WS --> UI: 更新整体进度
 Mike -> TS: schedule_task(task-3, assignee="Alex")
 TS -> Alex: assign_task(task-3)
 
+Alex -> SM: get_session(session_id)
+SM --> Alex: Session对象
+
 Alex -> MR: 发送AgentMessage(status='working')
 MR -> WS: 广播Alex工作状态
 WS --> UI: ChatUI显示Alex工作状态
 
 Alex -> TE: execute_tool("Editor.read", "architecture.md")
+TE -> SM: get_file(session_id, path)
+SM --> TE: 架构文档
 TE --> Alex: 架构文档
 
 loop 为每个组件生成代码
@@ -113,10 +158,18 @@ loop 为每个组件生成代码
     WS --> UI: 实时更新进度条
     
     Alex -> TE: execute_tool("Editor.write", "component.tsx")
+    TE -> SM: save_file(session_id, path, content)
+    SM --> TE: 保存成功
     TE --> Alex: 写入成功
 end
 
 Alex -> TE: execute_tool("Terminal.run", "npm install")
+TE -> TT: run_command("npm install")
+TT -> SM: get_working_directory(session_id)
+SM --> TT: working_dir
+TT -> CS: execute_command("npm install", working_dir)
+CS --> TT: 执行结果
+TT --> TE: 安装完成
 TE --> Alex: 安装完成
 
 Alex -> MR: 更新进度(progress=80)
@@ -124,6 +177,10 @@ MR -> WS: 广播进度
 WS --> UI: 更新进度条
 
 Alex -> TE: execute_tool("Terminal.run", "npm run build")
+TE -> TT: run_command("npm run build")
+TT -> CS: execute_command("npm run build", working_dir)
+CS --> TT: 构建成功
+TT --> TE: 构建结果
 TE --> Alex: 构建成功
 
 Alex -> MR: 发送AgentMessage(status='completed', progress=100)
@@ -147,20 +204,81 @@ MR -> WS: 广播消息
 WS --> UI: 显示Mike的消息
 UI --> User: 展示完成通知
 
-== 阶段6: 用户预览和部署 ==
+== 阶段6: 用户预览站点 (修复点2: 预览流程) ==
 User -> UI: 点击"预览"
-UI -> API: GET /api/preview/{session_id}
-API -> SM: get_session_files(session_id)
-SM -> DB: 获取文件列表
-DB --> SM: 文件数据
-SM --> API: 返回文件
-API --> UI: 预览数据
+UI -> API: POST /api/preview/start
+    note right
+        Headers: {
+            "Authorization": "Bearer eyJhbGc..."
+        }
+        Body: {
+            "session_id": "uuid"
+        }
+    end note
+API -> Auth: 验证JWT
+Auth --> API: 验证通过
+
+API -> PS: start_preview(session_id)
+PS -> SM: get_session_files(session_id)
+SM -> DB: SELECT files WHERE session_id = ?
+DB --> SM: 文件列表
+SM --> PS: 文件数据
+
+PS -> CS: 创建预览容器
+    note right
+        - 复制文件到容器
+        - 安装依赖
+        - 启动应用
+    end note
+CS --> PS: 容器ID和端口
+    note right
+        Output: {
+            "container_id": "abc123",
+            "port": 3000
+        }
+    end note
+
+PS -> PS: 配置nginx反向代理
+    note right
+        upstream preview_abc123 {
+            server localhost:3000;
+        }
+    end note
+
+PS --> API: 预览URL
+    note right
+        Output: {
+            "preview_url": "https://preview.mgx.dev/abc123",
+            "status": "running"
+        }
+    end note
+API --> UI: 返回预览URL
+
+UI -> PS: GET https://preview.mgx.dev/abc123
+    note right
+        通过nginx访问Code Sandbox中的应用
+    end note
+PS -> CS: 转发请求到容器
+CS --> PS: 应用响应
+PS --> UI: 网站内容
 UI --> User: 渲染预览
 
+== 阶段7: 用户部署站点 ==
 User -> UI: 点击"部署"
 UI -> API: POST /api/deploy
-API -> Mike: 转发部署请求
+    note right
+        Headers: {
+            "Authorization": "Bearer eyJhbGc..."
+        }
+        Body: {
+            "session_id": "uuid",
+            "platform": "vercel"
+        }
+    end note
+API -> Auth: 验证JWT
+Auth --> API: 验证通过
 
+API -> Mike: 转发部署请求
 Mike -> TS: schedule_task(deploy_task, assignee="Alex")
 TS -> Alex: assign_task(deploy_task)
 
@@ -186,16 +304,18 @@ MR -> WS: 广播消息
 WS --> UI: 显示部署结果
 UI --> User: 展示部署链接
 
-== 阶段7: 上下文持久化 ==
+== 阶段8: 上下文持久化 ==
 Mike -> SM: update_session_context(session_id, context)
 SM -> DB: UPDATE sessions
 DB --> SM: 保存成功
+SM -> ContextStore: save_context(session_id, context)
+ContextStore --> SM: 同步完成
 
-note over Mike, Alex
-    架构优化总结:
-    1. 移除Agent Manager - Mike直接管理团队
-    2. Task Scheduler与所有Agent双向关联
-    3. Message Router连接所有Agent
+note over API, CS
+    架构修复总结:
+    1. Session Manager被所有组件依赖
+    2. 预览流程: Agent → Tool Executor → Terminal Tool → Code Sandbox → Preview Server
+    3. WebSocket鉴权: JWT验证 + Token刷新
 end note
 
 @enduml
