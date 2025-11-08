@@ -32,7 +32,7 @@ mgx-mvp/
 │   │   │   ├── alex.py               # Alex Agent (工程师)
 │   │   │   ├── david.py              # David Agent (数据分析师)
 │   │   │   ├── iris.py               # Iris Agent (研究员)
-│   │   │   ├── manager.py            # Agent Manager
+│   │   │   ├── manager.py            # Agent Manager（技术支撑层）
 │   │   │   ├── memory.py             # Agent记忆系统
 │   │   │   └── prompts/              # Agent提示词模板
 │   │   │       ├── mike_prompts.py
@@ -76,7 +76,16 @@ mgx-mvp/
 │   │   │   │   ├── __init__.py
 │   │   │   │   ├── manager.py        # SessionManager
 │   │   │   │   ├── context.py        # Context
-│   │   │   │   └── store.py          # ContextStore
+│   │   │   │   ├── store.py          # ContextStore
+│   │   │   │   ├── validator.py      # 会话验证（新增）
+│   │   │   │   └── lifecycle.py      # 会话生命周期管理（新增）
+│   │   │   │
+│   │   │   ├── preview/              # 预览服务（新增）
+│   │   │   │   ├── __init__.py
+│   │   │   │   ├── server.py         # PreviewServer主类
+│   │   │   │   ├── proxy.py          # nginx反向代理配置
+│   │   │   │   ├── port_manager.py   # 端口管理
+│   │   │   │   └── url_generator.py  # 预览URL生成
 │   │   │   │
 │   │   │   └── messaging/            # 消息系统
 │   │   │       ├── __init__.py
@@ -135,37 +144,24 @@ mgx-mvp/
 │   │   ├── middleware/               # 中间件
 │   │   │   ├── __init__.py
 │   │   │   ├── auth.py               # 认证中间件
+│   │   │   ├── websocket_auth.py     # WebSocket鉴权中间件（新增）
+│   │   │   ├── token_refresh.py      # Token刷新中间件（新增）
 │   │   │   ├── cors.py               # CORS中间件
 │   │   │   ├── logging.py            # 日志中间件
 │   │   │   └── rate_limit.py         # 限流中间件
 │   │   │
 │   │   └── utils/                    # 工具函数
 │   │       ├── __init__.py
-│   │       ├── security.py           # 安全相关
+│   │       ├── security.py           # 安全相关（保留）
+│   │       ├── security/             # 安全相关（新增目录）
+│   │       │   ├── __init__.py
+│   │       │   ├── jwt_handler.py    # JWT生成和验证
+│   │       │   ├── password.py       # 密码加密
+│   │       │   └── token_refresh.py  # Token刷新逻辑
 │   │       ├── logger.py             # 日志配置
 │   │       ├── cache.py              # 缓存工具
 │   │       └── helpers.py            # 辅助函数
 │   │
-│   ├── tests/                        # 测试
-│   │   ├── __init__.py
-│   │   ├── conftest.py               # pytest配置
-│   │   ├── test_agents/              # Agent测试
-│   │   ├── test_api/                 # API测试
-│   │   ├── test_core/                # 核心服务测试
-│   │   └── test_integration/         # 集成测试
-│   │
-│   ├── scripts/                      # 脚本
-│   │   ├── init_db.py                # 初始化数据库
-│   │   ├── seed_data.py              # 填充测试数据
-│   │   └── run_migrations.py         # 运行迁移
-│   │
-│   ├── requirements.txt              # Python依赖
-│   ├── requirements-dev.txt          # 开发依赖
-│   ├── Dockerfile                    # Docker镜像
-│   ├── docker-compose.yml            # Docker Compose配置
-│   ├── .env.example                  # 环境变量示例
-│   └── README.md                     # 后端文档
-│
 ├── frontend/                         # 前端应用
 │   ├── public/                       # 静态资源
 │   │   ├── favicon.ico
@@ -244,7 +240,8 @@ mgx-mvp/
 │   │   ├── lib/                      # 工具库
 │   │   │   ├── api/                  # API客户端
 │   │   │   │   ├── client.ts         # Axios配置
-│   │   │   │   ├── auth.ts           # 认证API
+│   │   │   │   ├── auth.ts           # 认证API（增强）
+│   │   │   │   ├── token.ts          # Token管理（新增）
 │   │   │   │   ├── session.ts        # 会话API
 │   │   │   │   ├── chat.ts           # 聊天API
 │   │   │   │   ├── file.ts           # 文件API
@@ -252,7 +249,8 @@ mgx-mvp/
 │   │   │   │
 │   │   │   ├── websocket/            # WebSocket客户端
 │   │   │   │   ├── client.ts
-│   │   │   │   └── handlers.ts
+│   │   │   │   ├── handlers.ts
+│   │   │   │   └── auth.ts           # WebSocket鉴权（新增）
 │   │   │   │
 │   │   │   ├── utils/                # 工具函数
 │   │   │   │   ├── format.ts
@@ -289,20 +287,6 @@ mgx-mvp/
 │   │           ├── light.css
 │   │           └── dark.css
 │   │
-│   ├── tests/                        # 前端测试
-│   │   ├── unit/                     # 单元测试
-│   │   ├── integration/              # 集成测试
-│   │   └── e2e/                      # E2E测试 (Playwright)
-│   │
-│   ├── package.json                  # npm依赖
-│   ├── tsconfig.json                 # TypeScript配置
-│   ├── next.config.js                # Next.js配置
-│   ├── tailwind.config.js            # Tailwind配置
-│   ├── .eslintrc.json                # ESLint配置
-│   ├── .prettierrc                   # Prettier配置
-│   ├── Dockerfile                    # Docker镜像
-│   └── README.md                     # 前端文档
-│
 ├── docs/                             # 文档
 │   ├── prd/                          # 产品需求文档
 │   │   └── mgx_mvp_prd.md
@@ -330,6 +314,10 @@ mgx-mvp/
 │   │   ├── deployment.yaml
 │   │   ├── service.yaml
 │   │   └── ingress.yaml
+│   ├── nginx/                        # nginx配置（新增）
+│   │   ├── nginx.conf                # 主配置
+│   │   ├── preview.conf.template     # 预览服务配置模板
+│   │   └── ssl/                      # SSL证书
 │   └── terraform/                    # Terraform配置
 │       ├── main.tf
 │       ├── variables.tf
@@ -392,6 +380,13 @@ mgx-mvp/
 - 解析任务依赖关系
 - 优先级队列管理
 
+
+#### `backend/app/agents/manager.py`
+- Agent 管理器（技术支撑层）
+- 管理 Agent 实例生命周期（创建/销毁/重启）
+- 执行 Mike 的指令（获取目标 Agent 并执行任务）
+- 通知 Mike 完成情况（不做决策，仅转发）
+- 维护 Agent 状态，协助消息路由
 ### 前端核心文件
 
 #### `frontend/src/app/layout.tsx`

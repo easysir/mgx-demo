@@ -7,8 +7,11 @@
 #### 后端技术栈
 - **框架**: FastAPI (Python 3.11+)
   - 理由: 高性能异步框架，原生支持WebSocket，类型提示完善，文档自动生成
-- **Agent框架**: 自研基于LangChain的多Agent系统
-  - 理由: 灵活可控，支持自定义Agent行为和工具集成
+- **Agent框架**: 自研多Agent协作系统
+  - 理由: 灵活可控，支持自定义Agent行为和精确的任务调度
+  - LLM调用: 使用 LangChain 的 LLM 封装（ChatOpenAI, ChatAnthropic 等）
+  - 工具系统: 参考 LangChain Tool 接口，实现自定义 ToolExecutor
+  - 不依赖 LangChain 的 Agent 编排能力，实现自己的协作逻辑
 - **数据库**: 
   - PostgreSQL 15+ (主数据库，存储用户、会话、任务等结构化数据)
   - Redis 7+ (缓存、消息队列、会话状态)
@@ -74,23 +77,31 @@
 **Phase 1 (MVP核心)**:
 - ✅ 用户认证和会话管理
 - ✅ 基础聊天界面和流式输出（整合Agent状态和任务进度）
-- ✅ Mike(协调者) + Alex(工程师)两个核心Agent
-- ✅ 前端网页开发能力(React/Next.js)
+- ✅ 完整的Agent团队（6人团队，缺一不可）:
+  - Mike Agent (Team Leader) - 需求分析、任务规划、团队协调、质量把关
+  - Emma Agent (Product Manager) - 需求分析、市场调研、PRD编写
+  - Bob Agent (Architect) - 系统架构设计、技术选型、设计文档
+  - Alex Agent (Engineer) - 代码开发、测试、部署
+  - David Agent (Data Analyst) - 数据分析、可视化、机器学习（基础能力）
+  - Iris Agent (Researcher) - 信息收集、网络搜索、文档研究
+- ✅ 前端网页开发能力(React/Next.js/Shadcn-ui)
 - ✅ 代码编辑器和文件管理
-- ✅ 基础预览功能
+- ✅ 预览功能（Preview Server + nginx 反向代理）
 - ✅ GitHub集成(代码提交)
-
+- ✅ WebSocket 鉴权和安全机制（JWT + Token 刷新）
 **Phase 2 (功能扩展)**:
-- Emma(产品经理) + Bob(架构师)
-- Supabase后端集成
-- 多模型切换
-- 部署到Vercel/Netlify
-
+- Supabase后端集成（增强 Alex 的后端能力）
+- 多模型切换（增强 LLM Service）
+- 部署到Vercel/Netlify（增强部署能力）
+- Python/数据科学支持（增强 David 的能力）
+- 高级搜索与爬虫支持（增强 Iris 的能力）
 **Phase 3 (高级功能)**:
-- David(数据分析) + Iris(研究员)
-- Python/数据科学支持
-- 协作功能(多用户)
+- 协作功能(多用户实时编辑)
 - 项目模板库
+- 私有部署支持
+- 企业级功能（权限管理、审计日志）
+- 性能优化与扩展性
+
 
 ---
 
