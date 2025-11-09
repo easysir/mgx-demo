@@ -12,6 +12,7 @@
     "dev": "turbo run dev --parallel",
     "dev:frontend": "pnpm --filter mgx-frontend dev",
     "dev:backend": "bash tools/scripts/dev_backend.sh",
+    "sync:backend": "bash tools/scripts/sync_backend.sh",
     "lint": "turbo run lint",
     "format": "turbo run format",
     "setup": "bash tools/scripts/bootstrap.sh"
