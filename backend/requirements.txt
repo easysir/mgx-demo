@@ -43,6 +43,9 @@ PyGithub==2.1.1
 # Docker Integration
 docker==6.1.3
 
+# Process and System Monitoring
+psutil==5.9.6
+
 # File I/O
 aiofiles==23.2.1
 

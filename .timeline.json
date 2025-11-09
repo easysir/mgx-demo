@@ -1,5 +1,5 @@
 {
-  "timeline_index": 209,
+  "timeline_index": 218,
   "planner": {
     "Team Leader": {
       "1": {
@@ -15,7 +15,7 @@
         "start_at": 1762590488.903187,
         "end_at": 1762591037.1490507
       },
-      "current_task_id": "14",
+      "current_task_id": "15",
       "2": {
         "task_id": "2",
         "dependent_task_ids": [],
@@ -53,7 +53,21 @@
         "is_finished": true,
         "assignee": "Alex",
         "start_at": 1762681767.4003623,
-        "end_at": 1762681896.6226652
+        "end_at": 1762681998.4293768
+      },
+      "15": {
+        "task_id": "15",
+        "dependent_task_ids": [
+          "14"
+        ],
+        "instruction": "实现 Code Sandbox 代码执行和预览功能。包括：1. 创建 CodeSandboxService 服务类，支持代码执行、文件管理和进程管理；2. 实现安全的代码执行环境，包括资源限制和超时控制；3. 创建预览服务器，支持 Web 应用的实时预览；4. 实现文件监控和热重载功能；5. 添加相关 API 端点。参考设计文档 /workspace/docs/design/system_design.md 中的 Code Sandbox 部分。",
+        "task_type": "general",
+        "code": "",
+        "result": "",
+        "is_success": false,
+        "is_finished": false,
+        "assignee": "Alex",
+        "start_at": 1762681998.4293838
       }
     }
   },
@@ -267,7 +281,16 @@
     "206": 1,
     "207": 1,
     "208": 1,
-    "209": 1
+    "209": 1,
+    "210": 1,
+    "211": 1,
+    "212": 1,
+    "213": 1,
+    "214": 1,
+    "215": 1,
+    "216": 1,
+    "217": 1,
+    "218": 1
   },
   "preview_servers": {},
   "preview_server": null,
