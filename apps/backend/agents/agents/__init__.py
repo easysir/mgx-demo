@@ -1,11 +1,30 @@
-"""Agent implementations.
+"""Agent implementations."""
 
-Each agent inherits from :class:`BaseAgent` and can access shared tool executors.
-Real LLM/tool logic will live here; for now we provide placeholders to clarify
-responsibilities.
-"""
+from .base import AgentContext, BaseAgent
+from .roles.alex import AlexAgent
+from .roles.bob import BobAgent
+from .roles.david import DavidAgent
+from .roles.emma import EmmaAgent
+from .roles.iris import IrisAgent
+from .roles.mike import MikeAgent
 
-from .base import BaseAgent
-from .team import AGENT_CLASS_MAP
+AGENT_CLASS_MAP = {
+    'Mike': MikeAgent,
+    'Emma': EmmaAgent,
+    'Bob': BobAgent,
+    'Alex': AlexAgent,
+    'David': DavidAgent,
+    'Iris': IrisAgent,
+}
 
-__all__ = ['BaseAgent', 'AGENT_CLASS_MAP']
+__all__ = [
+    'AgentContext',
+    'BaseAgent',
+    'AlexAgent',
+    'BobAgent',
+    'DavidAgent',
+    'EmmaAgent',
+    'IrisAgent',
+    'MikeAgent',
+    'AGENT_CLASS_MAP',
+]

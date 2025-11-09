@@ -1,3 +1,3 @@
-from .default import DefaultWorkflow
+from .orchestrator import SequentialWorkflow
 
-__all__ = ['DefaultWorkflow']
+__all__ = ['SequentialWorkflow']

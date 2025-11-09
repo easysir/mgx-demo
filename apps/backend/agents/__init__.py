@@ -6,6 +6,6 @@ interfaces are designed so we can lift this package into a dedicated service
 once RPC boundaries are ready.
 """
 
-from .runtime import AgentDispatch, AgentOrchestrator, WorkflowContext, get_agent_orchestrator
+from .runtime import AgentDispatch, AgentExecutor, WorkflowContext, get_agent_orchestrator
 
-__all__ = ['AgentDispatch', 'AgentOrchestrator', 'WorkflowContext', 'get_agent_orchestrator']
+__all__ = ['AgentDispatch', 'AgentExecutor', 'WorkflowContext', 'get_agent_orchestrator']

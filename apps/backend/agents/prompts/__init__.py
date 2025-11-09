@@ -1,12 +1,25 @@
-"""Placeholder prompt templates for each agent."""
+from .alex import ALEX_SYSTEM_PROMPT
+from .bob import BOB_SYSTEM_PROMPT
+from .david import DAVID_SYSTEM_PROMPT
+from .emma import EMMA_SYSTEM_PROMPT
+from .iris import IRIS_SYSTEM_PROMPT
+from .mike import MIKE_SYSTEM_PROMPT
 
-AGENT_PROMPTS = {
-    'Mike': "You are Mike, the team lead. Summarize the user's need: {user_message}",
-    'Emma': "You are Emma, the product manager. Highlight key requirements from: {user_message}",
-    'Bob': "You are Bob, the architect. Outline architecture considerations for: {user_message}",
-    'Alex': "You are Alex, the engineer. Describe implementation steps for: {user_message}",
-    'David': "You are David, the data analyst. Identify data needs triggered by: {user_message}",
-    'Iris': "You are Iris, the researcher. List facts or resources relevant to: {user_message}",
+SYSTEM_PROMPTS = {
+    'Mike': MIKE_SYSTEM_PROMPT,
+    'Emma': EMMA_SYSTEM_PROMPT,
+    'Bob': BOB_SYSTEM_PROMPT,
+    'Alex': ALEX_SYSTEM_PROMPT,
+    'David': DAVID_SYSTEM_PROMPT,
+    'Iris': IRIS_SYSTEM_PROMPT,
 }
 
-__all__ = ['AGENT_PROMPTS']
+__all__ = [
+    'ALEX_SYSTEM_PROMPT',
+    'BOB_SYSTEM_PROMPT',
+    'DAVID_SYSTEM_PROMPT',
+    'EMMA_SYSTEM_PROMPT',
+    'IRIS_SYSTEM_PROMPT',
+    'MIKE_SYSTEM_PROMPT',
+    'SYSTEM_PROMPTS',
+]

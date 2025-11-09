@@ -1,4 +1,4 @@
-"""Default sequential workflow: Mike → team status → Alex, etc."""
+"""Sequential orchestrator describing Mike→Alex hand-off."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from shared.types import AgentRole, SenderRole
 
 from ..config import AgentRegistry
 from ..llm import LLMService
-from ..runtime.orchestrator import AgentDispatch, AgentWorkflow, WorkflowContext
+from ..runtime.executor import AgentDispatch, AgentWorkflow, WorkflowContext
 
 
 @dataclass(frozen=True)
@@ -31,8 +31,8 @@ class WorkflowStage:
         return AgentDispatch(sender=self.sender, agent=self.agent, content=content)
 
 
-class DefaultWorkflow(AgentWorkflow):
-    """MVP workflow that mimics Mike coordinating Alex."""
+class SequentialWorkflow(AgentWorkflow):
+    """MVP orchestrator that mimics Mike coordinating Alex in顺序模式."""
 
     def __init__(self, llm_service: LLMService) -> None:
         self._llm_service = llm_service

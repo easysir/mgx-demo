@@ -1,4 +1,4 @@
-"""Agent orchestrator responsible for coordinating workflows.
+"""Agent execution engine responsible for coordinating workflows.
 
 Runs in-process for now; TODO remove tight coupling when we move to a dedicated
 agent microservice communicating via RPC/queue.
@@ -33,7 +33,7 @@ class AgentWorkflow:
         raise NotImplementedError
 
 
-class AgentOrchestrator:
+class AgentExecutor:
     def __init__(self, *, registry: AgentRegistry, workflow: AgentWorkflow) -> None:
         self._registry = registry
         self._workflow = workflow

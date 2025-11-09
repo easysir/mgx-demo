@@ -1,4 +1,7 @@
-"""Base class shared by all agents."""
+"""Base class shared by all agents.
+
+这个模块定义了 Agent 在运行时的标准接口，确保每个角色都能以一致的方式接收上下文、规划任务并输出结果。
+"""
 
 from __future__ import annotations
 
@@ -10,7 +13,10 @@ from shared.types import AgentRole
 
 @dataclass
 class AgentContext:
-    """Runtime context injected into each agent."""
+    """Runtime context injected into each agent.
+
+    运行时上下文会携带会话、用户和当前输入等信息，方便 Agent 在不共享状态的情况下读取所需数据。
+    """
 
     session_id: str
     user_id: str
@@ -19,7 +25,10 @@ class AgentContext:
 
 
 class BaseAgent:
-    """Base behaviour that concrete agents can extend."""
+    """Base behaviour that concrete agents can extend.
+
+    基类约定了 plan/act/report 生命周期，具体角色可按需覆写，从而保持协作流程统一。
+    """
 
     name: AgentRole
 
@@ -28,7 +37,7 @@ class BaseAgent:
         self.description = description
 
     async def plan(self, context: AgentContext) -> str:
-        """Optional planning step before执行工具."""
+        """Optional planning step before执行工具。"""
         raise NotImplementedError
 
     async def act(self, context: AgentContext) -> str:
