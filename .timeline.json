@@ -1,5 +1,5 @@
 {
-  "timeline_index": 191,
+  "timeline_index": 209,
   "planner": {
     "Team Leader": {
       "1": {
@@ -15,7 +15,7 @@
         "start_at": 1762590488.903187,
         "end_at": 1762591037.1490507
       },
-      "current_task_id": "3",
+      "current_task_id": "14",
       "2": {
         "task_id": "2",
         "dependent_task_ids": [],
@@ -39,7 +39,21 @@
         "is_success": false,
         "is_finished": false,
         "assignee": "Alex",
-        "start_at": 1762591481.6842752
+        "start_at": 1762591481.6842752,
+        "end_at": 1762681767.4003544
+      },
+      "14": {
+        "task_id": "14",
+        "dependent_task_ids": [],
+        "instruction": "继续开发后端核心功能,包括:1. 实现 WebSocket 基础设施以支持实时双向通信;2. 开发基础的 Tool 系统并创建 FileSystemTool;3. 集成 LLM 服务使代理能够执行智能任务。参考设计文档 /workspace/docs/design/system_design.md 和 /workspace/docs/design/class_diagram.plantuml。",
+        "task_type": "general",
+        "code": "",
+        "result": "",
+        "is_success": false,
+        "is_finished": true,
+        "assignee": "Alex",
+        "start_at": 1762681767.4003623,
+        "end_at": 1762681896.6226652
       }
     }
   },
@@ -235,7 +249,25 @@
     "188": 1,
     "189": 1,
     "190": 1,
-    "191": 1
+    "191": 1,
+    "192": 1,
+    "193": 1,
+    "194": 1,
+    "195": 1,
+    "196": 1,
+    "197": 1,
+    "198": 1,
+    "199": 1,
+    "200": 1,
+    "201": 1,
+    "202": 1,
+    "203": 1,
+    "204": 1,
+    "205": 1,
+    "206": 1,
+    "207": 1,
+    "208": 1,
+    "209": 1
   },
   "preview_servers": {},
   "preview_server": null,
