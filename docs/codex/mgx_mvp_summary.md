@@ -27,3 +27,25 @@
 2. 将实施规划拆解为里程碑与负责人，确保 Phase 1 关键组件（Session Manager、Task Scheduler、Preview Server、整合 ChatUI）按周交付。
 3. 基于 UI/架构文档输出中高保真原型，验证 30/70 布局与整合式 ChatUI 的交互细节，为前端开发定稿。
 
+---
+
+## 阶段工作总结（Phase 1）
+### 已完成
+- 建立数据驱动的多 Agent Chat Workspace：后端 FastAPI + 前端 Next.js + Turborepo 的 monorepo 架构已经到位，支持会话创建、消息传递、实时 UI。
+- 实现基础认证链路：账号/密码登录、Profile 获取以及 Bearer Token 鉴权；所有会话/chat API 均受保护。
+- ChatUI / Editor / Preview 的页面骨架：30% Chat + 70% Editor/Preview 布局在浅色主题下运行，历史会话与导航交互逻辑完成。
+- 初步文档体系：系统设计、实施规划、文件结构、API 概览等，确保后续阶段有可参照的基线。
+
+### 存在的限制
+- 会话/消息仍存内存，尚未落地 PostgreSQL/Redis；一旦进程重启会丢失，需要 Phase 2 引入持久化层。
+- Agent 回复为静态模拟，尚未接入真实 LLM/多 Agent 编排；Preview/部署/文件操作也还未和后端联动。
+- 鉴权逻辑仅支持登录、不含登出/刷新 token 的后端处理，前端临时通过 localStorage 管理。
+- 部分 UI（Editor/Preview）仍为占位，需要结合 Monaco、Terminal、Docker 沙箱等实际功能。
+
+### Phase 2 关注点
+1. **数据与状态持久化**：实现数据库模型、Alembic 迁移、Redis 会话缓存；SessionStore 替换为持久化服务。
+2. **Agent/Tool 接口**：将 ChatAPI 与 LLM/Multi-Agent 编排对接；实现文件读写、终端、预览、部署相关 API。
+3. **鉴权与多用户**：完善 JWT 刷新、登出、权限控制；支持多用户各自维护会话、资源配额。
+4. **前端体验**：引入 Monaco Editor、真实文件树、终端输出与 Preview Server；完善登录态/未登录态流程。
+
+该总结可作为第二阶段继续迭代（持久化、功能联动、企业级需求）的参考。 
