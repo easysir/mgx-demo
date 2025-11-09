@@ -327,6 +327,15 @@ body {
   font-size: 0.9rem;
 }
 
+.chat-panel__error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 0.9rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  background: rgba(185, 28, 28, 0.1);
+}
+
 .chat-panel__message header {
   display: flex;
   justify-content: space-between;

@@ -305,13 +305,13 @@ export default function Home() {
         </section>
       ) : (
         <>
-          {error && <p className="workspace__error">{error}</p>}
-         <section className="workspace__grid">
+          <section className="workspace__grid">
             <ChatPanel
               sessionId={sessionId}
               messages={messages}
               streamingMessages={Object.values(streamingMessages)}
               isSending={isSending}
+              error={error}
               onSend={handleSend}
             />
             <div className="workspace__right">

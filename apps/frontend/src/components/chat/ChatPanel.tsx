@@ -9,6 +9,7 @@ interface ChatPanelProps {
   messages: Message[];
   streamingMessages?: Message[];
   isSending: boolean;
+  error?: string | null;
   onSend: (content: string) => Promise<void>;
 }
 
@@ -19,7 +20,14 @@ const labelMap: Record<Message['sender'], string> = {
   status: '状态'
 };
 
-export function ChatPanel({ sessionId, messages, streamingMessages = [], isSending, onSend }: ChatPanelProps) {
+export function ChatPanel({
+  sessionId,
+  messages,
+  streamingMessages = [],
+  isSending,
+  error,
+  onSend
+}: ChatPanelProps) {
   const [draft, setDraft] = useState('');
 
   const handleSend = async () => {
@@ -71,6 +79,7 @@ export function ChatPanel({ sessionId, messages, streamingMessages = [], isSendi
         ))}
       </div>
 
+      {error && <p className="chat-panel__error">{error}</p>}
       <div className="chat-panel__input">
         <textarea
           rows={3}
