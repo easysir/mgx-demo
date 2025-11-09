@@ -2,7 +2,7 @@
     "tabs": {
         "00": {
             "tab_id": "00",
-            "cwd": "/workspace",
+            "cwd": "/workspace/backend",
             "observer": {
                 "block": "Terminal",
                 "uuid": "a93c50c5-e76c-4bc7-8e3e-7886e198e25f",
@@ -13,9 +13,23 @@
                 "bash"
             ],
             "command_terminator": "\n"
+        },
+        "01": {
+            "tab_id": "01",
+            "cwd": "/workspace/backend",
+            "observer": {
+                "block": "Terminal",
+                "uuid": "214f9253-c64e-4605-9dae-49f76aaf580f",
+                "enable_llm_stream": false,
+                "callback_url": ""
+            },
+            "shell_command": [
+                "bash"
+            ],
+            "command_terminator": "\n"
         }
     },
-    "current_tab_id": "00",
+    "current_tab_id": "01",
     "forbidden_commands": {
         "run preview": "Use Deployer.deploy_to_public instead.",
         "serve ": "Use Deployer.deploy_to_public instead.",
