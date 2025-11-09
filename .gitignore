@@ -1,0 +1,22 @@
+# Node / pnpm
+node_modules/
+pnpm-lock.yaml
+.turbo/
+
+# Python
+__pycache__/
+.python-version
+.venv/
+venv/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Env / build artifacts
+dist/
+build/
+.env
+.env.*
+

@@ -1,0 +1,22 @@
+{
+  "name": "mgx-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.12.2",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "dev:frontend": "pnpm --filter mgx-frontend dev",
+    "dev:backend": "bash tools/scripts/dev_backend.sh",
+    "lint": "turbo run lint",
+    "format": "turbo run format",
+    "setup": "bash tools/scripts/bootstrap.sh"
+  },
+  "devDependencies": {
+    "turbo": "^2.1.0"
+  }
+}
