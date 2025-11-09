@@ -45,13 +45,14 @@ class SessionStore:
         content: str,
         agent: Optional[AgentRole] = None,
         owner_id: Optional[str] = None,
+        message_id: Optional[str] = None,
     ) -> Message:
         session = self.get_session(session_id, owner_id)
         if not session:
             raise KeyError(f'Session {session_id} not found')
 
         message = Message(
-            id=str(uuid4()),
+            id=message_id or str(uuid4()),
             session_id=session_id,
             sender=sender,
             content=content,

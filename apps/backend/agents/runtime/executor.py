@@ -7,7 +7,7 @@ agent microservice communicating via RPC/queue.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Callable, Awaitable, Dict, Any
 
 from shared.types import AgentRole, SenderRole
 
@@ -19,6 +19,7 @@ class AgentDispatch:
     sender: SenderRole
     content: str
     agent: Optional[AgentRole] = None
+    message_id: Optional[str] = None
 
 
 @dataclass(frozen=True)
@@ -28,8 +29,16 @@ class WorkflowContext:
     user_message: str
 
 
+StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]
+
+
 class AgentWorkflow:
-    async def generate(self, context: WorkflowContext, registry: AgentRegistry) -> list[AgentDispatch]:
+    async def generate(
+        self,
+        context: WorkflowContext,
+        registry: AgentRegistry,
+        stream_publisher: Optional[StreamPublisher] = None,
+    ) -> list[AgentDispatch]:
         raise NotImplementedError
 
 
@@ -38,6 +47,8 @@ class AgentExecutor:
         self._registry = registry
         self._workflow = workflow
 
-    async def handle_user_turn(self, context: WorkflowContext) -> list[AgentDispatch]:
+    async def handle_user_turn(
+        self, context: WorkflowContext, stream_publisher: Optional[StreamPublisher] = None
+    ) -> list[AgentDispatch]:
         """Generate agent dispatches for a user turn."""
-        return await self._workflow.generate(context, self._registry)
+        return await self._workflow.generate(context, self._registry, stream_publisher=stream_publisher)

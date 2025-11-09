@@ -6,7 +6,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, AsyncIterator
 
 from .providers import EchoProvider, LLMProvider, get_builtin_provider
 
@@ -99,6 +99,27 @@ class LLMService:
             logger.exception('LLMService: provider=%s failed, falling back to EchoProvider', provider_name, exc_info=exc)
             fallback = EchoProvider(name='Fallback', model='echo', api_key=None)
             return await fallback.generate(prompt=prompt, **kwargs)
+
+    async def stream_generate(
+        self,
+        *,
+        prompt: str,
+        provider: Optional[str] = None,
+        **kwargs,
+    ) -> AsyncIterator[str]:
+        """Stream text chunks from the selected provider."""
+
+        selected = self.get_provider(provider)
+        provider_name = getattr(selected, 'name', provider or self._config.default_provider)
+        stream_method = getattr(selected, 'stream_generate', None)
+        if stream_method is None:
+            logger.info('LLMService: provider=%s has no stream API, returning single chunk', provider_name)
+            result = await selected.generate(prompt=prompt, **kwargs)
+            yield result
+            return
+        logger.info('LLMService: streaming via provider=%s model=%s', provider_name, getattr(selected, 'model', 'unknown'))
+        async for chunk in stream_method(prompt=prompt, **kwargs):
+            yield chunk
 
 
 _LLM_SERVICE: Optional[LLMService] = None

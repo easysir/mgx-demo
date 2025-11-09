@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, AsyncIterator
 
 from openai import AsyncOpenAI, OpenAIError
 
@@ -55,8 +55,35 @@ class OpenAIProvider(LLMProvider):
             )
             content = completion.choices[0].message.content
             if isinstance(content, list):
-                return ''.join(part['text'] for part in content if isinstance(part, dict) and part.get('text'))
+                return ''.join(
+                    part.get('text', '') if isinstance(part, dict) else str(part) for part in content
+                )
             return content or ''
+        except OpenAIError as exc:
+            raise RuntimeError(f'OpenAI API error: {exc}') from exc
+
+    async def stream_generate(self, *, prompt: str, **kwargs: Any) -> AsyncIterator[str]:
+        try:
+            temperature = kwargs.get('temperature', 0.3)
+            stream = await self._client.chat.completions.create(
+                model=self.model,
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=temperature,
+                stream=True,
+            )
+            async for chunk in stream:
+                choice = chunk.choices[0]
+                delta = choice.delta.content
+                if not delta:
+                    continue
+                if isinstance(delta, list):
+                    text = ''.join(
+                        part.get('text', '') if isinstance(part, dict) else str(part) for part in delta
+                    )
+                else:
+                    text = delta
+                if text:
+                    yield text
         except OpenAIError as exc:
             raise RuntimeError(f'OpenAI API error: {exc}') from exc
 

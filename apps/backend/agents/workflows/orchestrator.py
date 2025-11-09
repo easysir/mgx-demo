@@ -1,17 +1,18 @@
-"""State-machine orchestrator describing Mike-led dynamic task routing."""
+"""State-machine orchestrator describing Mike-led dynamic task routing with streaming."""
 
 from __future__ import annotations
 
 import json
 import re
 from typing import Dict, List, Optional
+from uuid import uuid4
 
 from shared.types import AgentRole, SenderRole
 
 from ..config import AgentRegistry
 from ..llm import LLMService
 from ..prompts import SYSTEM_PROMPTS
-from ..runtime.executor import AgentDispatch, AgentWorkflow, WorkflowContext
+from ..runtime.executor import AgentDispatch, AgentWorkflow, StreamPublisher, WorkflowContext
 
 AGENT_EXECUTION_ORDER: List[AgentRole] = ['Emma', 'Bob', 'Alex', 'David', 'Iris']
 AGENT_PROVIDERS: Dict[AgentRole, str] = {
@@ -42,87 +43,264 @@ Include contributions from: {contributors}. Provide next recommended action."""
 
 
 class SequentialWorkflow(AgentWorkflow):
-    """MVP orchestrator that lets Mike动态指派或结束任务."""
+    """MVP orchestrator that lets Mike 动态指派或结束任务，并支持流式输出."""
 
     MAX_ITERATIONS = 6
 
     def __init__(self, llm_service: LLMService) -> None:
         self._llm_service = llm_service
 
-    async def generate(self, context: WorkflowContext, registry: AgentRegistry) -> list[AgentDispatch]:
+    async def generate(
+        self,
+        context: WorkflowContext,
+        registry: AgentRegistry,
+        stream_publisher: Optional[StreamPublisher] = None,
+    ) -> list[AgentDispatch]:
         dispatches: list[AgentDispatch] = []
-        dispatches.append(self._status('Mike 正在评估任务，准备调度团队。'))
-
         available_agents = [agent for agent in AGENT_EXECUTION_ORDER if registry.is_enabled(agent)]
         visited_agents: list[AgentRole] = []
         last_agent_output: Optional[str] = None
 
-        plan_text = await self._prompt_mike_plan(context.user_message, available_agents)
-        dispatches.append(self._message('mike', 'Mike', plan_text))
+        await self._emit_status(
+            dispatches,
+            context.session_id,
+            'Mike 正在评估任务，准备调度团队。',
+            stream_publisher,
+        )
+
+        plan_text, plan_message_id = await self._stream_mike_plan(
+            context, available_agents, stream_publisher
+        )
+        dispatches.append(
+            AgentDispatch(sender='mike', agent='Mike', content=plan_text, message_id=plan_message_id)
+        )
         next_agent = self._extract_agent_hint(plan_text, available_agents)
 
         iterations = 0
         while next_agent and iterations < self.MAX_ITERATIONS:
             iterations += 1
-            dispatches.append(self._status(f'Mike 将任务交给 {next_agent}。'))
+            await self._emit_status(
+                dispatches,
+                context.session_id,
+                f'Mike 将任务交给 {next_agent}。',
+                stream_publisher,
+            )
 
-            agent_output = await self._run_agent(next_agent, context.user_message)
-            dispatches.append(self._message('agent', next_agent, agent_output))
+            agent_output, agent_message_id = await self._stream_agent_execution(
+                next_agent, context, stream_publisher
+            )
+            dispatches.append(
+                AgentDispatch(
+                    sender='agent',
+                    agent=next_agent,
+                    content=agent_output,
+                    message_id=agent_message_id,
+                )
+            )
             visited_agents.append(next_agent)
             last_agent_output = agent_output
 
             available_agents = [agent for agent in available_agents if agent != next_agent]
-            review_text = await self._prompt_mike_review(context.user_message, next_agent, agent_output, available_agents)
-            dispatches.append(self._message('mike', 'Mike', review_text))
+            review_text, review_message_id = await self._stream_mike_review(
+                context, next_agent, agent_output, available_agents, stream_publisher
+            )
+            dispatches.append(
+                AgentDispatch(
+                    sender='mike',
+                    agent='Mike',
+                    content=review_text,
+                    message_id=review_message_id,
+                )
+            )
 
             next_agent = self._extract_agent_hint(review_text, available_agents)
 
-        dispatches.append(self._status('Mike 收齐团队结果，准备向用户汇报结论与下一步。'))
-        summary = await self._prompt_mike_summary(context.user_message, visited_agents, last_agent_output)
-        dispatches.append(self._message('mike', 'Mike', summary))
+        await self._emit_status(
+            dispatches,
+            context.session_id,
+            'Mike 收齐团队结果，准备向用户汇报结论与下一步。',
+            stream_publisher,
+        )
+        summary_text, summary_message_id = await self._stream_mike_summary(
+            context, visited_agents, last_agent_output, stream_publisher
+        )
+        dispatches.append(
+            AgentDispatch(
+                sender='mike',
+                agent='Mike',
+                content=summary_text,
+                message_id=summary_message_id,
+            )
+        )
         return dispatches
 
-    async def _prompt_mike_plan(self, user_message: str, available_agents: list[AgentRole]) -> str:
+    async def _stream_mike_plan(
+        self,
+        context: WorkflowContext,
+        available_agents: list[AgentRole],
+        stream_publisher: Optional[StreamPublisher],
+    ) -> tuple[str, str]:
         prompt = MIKE_PLAN_PROMPT.format(
-            user_message=user_message,
+            user_message=context.user_message,
             available_agents=', '.join(available_agents) if available_agents else '暂无可用 Agent',
         )
-        return await self._llm_service.generate(prompt=prompt, provider=AGENT_PROVIDERS['Mike'])
+        message_id = self._new_message_id()
+        result = await self._stream_llm_output(
+            session_id=context.session_id,
+            sender='mike',
+            agent_name='Mike',
+            prompt=prompt,
+            provider=AGENT_PROVIDERS['Mike'],
+            stream_publisher=stream_publisher,
+            message_id=message_id,
+        )
+        return result, message_id
 
-    async def _prompt_mike_review(
+    async def _stream_mike_review(
         self,
-        user_message: str,
+        context: WorkflowContext,
         agent_name: AgentRole,
         agent_output: str,
         remaining_agents: list[AgentRole],
-    ) -> str:
+        stream_publisher: Optional[StreamPublisher],
+    ) -> tuple[str, str]:
         prompt = MIKE_REVIEW_PROMPT.format(agent_name=agent_name, agent_output=agent_output)
         if not remaining_agents:
             prompt += "\n没有剩余 Agent，可考虑 finish。"
-        return await self._llm_service.generate(prompt=prompt, provider=AGENT_PROVIDERS['Mike'])
+        message_id = self._new_message_id()
+        result = await self._stream_llm_output(
+            session_id=context.session_id,
+            sender='mike',
+            agent_name='Mike',
+            prompt=prompt,
+            provider=AGENT_PROVIDERS['Mike'],
+            stream_publisher=stream_publisher,
+            message_id=message_id,
+        )
+        return result, message_id
 
-    async def _prompt_mike_summary(
+    async def _stream_mike_summary(
         self,
-        user_message: str,
+        context: WorkflowContext,
         contributors: list[AgentRole],
         last_agent_output: Optional[str],
-    ) -> str:
+        stream_publisher: Optional[StreamPublisher],
+    ) -> tuple[str, str]:
         contributor_text = ', '.join(contributors) if contributors else 'Mike'
-        prompt = MIKE_SUMMARY_PROMPT.format(user_message=user_message, contributors=contributor_text)
+        prompt = MIKE_SUMMARY_PROMPT.format(user_message=context.user_message, contributors=contributor_text)
         if last_agent_output:
             prompt += f"\n最近一次交付内容：```{last_agent_output}```"
-        return await self._llm_service.generate(prompt=prompt, provider=AGENT_PROVIDERS['Mike'])
+        message_id = self._new_message_id()
+        result = await self._stream_llm_output(
+            session_id=context.session_id,
+            sender='mike',
+            agent_name='Mike',
+            prompt=prompt,
+            provider=AGENT_PROVIDERS['Mike'],
+            stream_publisher=stream_publisher,
+            message_id=message_id,
+        )
+        return result, message_id
 
-    async def _run_agent(self, agent_name: AgentRole, user_message: str) -> str:
+    async def _stream_agent_execution(
+        self,
+        agent_name: AgentRole,
+        context: WorkflowContext,
+        stream_publisher: Optional[StreamPublisher],
+    ) -> tuple[str, str]:
         template = SYSTEM_PROMPTS.get(agent_name)
-        prompt = template.format(user_message=user_message) if template else f'{agent_name} 正在处理 {user_message}'
+        prompt = template.format(user_message=context.user_message) if template else context.user_message
         provider = AGENT_PROVIDERS.get(agent_name, 'openai')
-        return await self._llm_service.generate(prompt=prompt, provider=provider)
+        message_id = self._new_message_id()
+        result = await self._stream_llm_output(
+            session_id=context.session_id,
+            sender='agent',
+            agent_name=agent_name,
+            prompt=prompt,
+            provider=provider,
+            stream_publisher=stream_publisher,
+            message_id=message_id,
+        )
+        return result, message_id
+
+    async def _stream_llm_output(
+        self,
+        *,
+        session_id: str,
+        sender: SenderRole,
+        agent_name: AgentRole,
+        prompt: str,
+        provider: str,
+        stream_publisher: Optional[StreamPublisher],
+        message_id: str,
+    ) -> str:
+        chunks: list[str] = []
+        async for chunk in self._llm_service.stream_generate(prompt=prompt, provider=provider):
+            chunks.append(chunk)
+            await self._publish_event(
+                stream_publisher,
+                session_id,
+                {
+                    'type': 'token',
+                    'sender': sender,
+                    'agent': agent_name,
+                    'content': chunk,
+                    'message_id': message_id,
+                    'final': False,
+                },
+            )
+        full_text = ''.join(chunks)
+        await self._publish_event(
+            stream_publisher,
+            session_id,
+            {
+                'type': 'token',
+                'sender': sender,
+                'agent': agent_name,
+                'content': full_text,
+                'message_id': message_id,
+                'final': True,
+            },
+        )
+        return full_text
+
+    async def _emit_status(
+        self,
+        dispatches: list[AgentDispatch],
+        session_id: str,
+        content: str,
+        stream_publisher: Optional[StreamPublisher],
+    ) -> None:
+        message_id = self._new_message_id()
+        dispatches.append(
+            AgentDispatch(sender='status', agent='Mike', content=content, message_id=message_id)
+        )
+        await self._publish_event(
+            stream_publisher,
+            session_id,
+            {
+                'type': 'status',
+                'sender': 'status',
+                'agent': 'Mike',
+                'content': content,
+                'message_id': message_id,
+                'final': True,
+            },
+        )
+
+    async def _publish_event(
+        self,
+        publisher: Optional[StreamPublisher],
+        session_id: str,
+        payload: Dict[str, object],
+    ) -> None:
+        if not publisher:
+            return
+        event = {'session_id': session_id, **payload}
+        await publisher(event)
 
     def _extract_agent_hint(self, text: str, candidates: list[AgentRole]) -> Optional[AgentRole]:
         if not candidates:
-            if self._contains_finish_token(text):
-                return None
             return None
         parsed = self._parse_json_agent(text)
         if parsed:
@@ -163,8 +341,5 @@ class SequentialWorkflow(AgentWorkflow):
         lower = text.lower()
         return any(token in lower for token in FINISH_TOKENS)
 
-    def _status(self, content: str) -> AgentDispatch:
-        return AgentDispatch(sender='status', agent='Mike', content=content)
-
-    def _message(self, sender: SenderRole, agent: AgentRole, content: str) -> AgentDispatch:
-        return AgentDispatch(sender=sender, agent=agent, content=content)
+    def _new_message_id(self) -> str:
+        return str(uuid4())

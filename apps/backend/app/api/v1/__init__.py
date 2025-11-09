@@ -1,4 +1,3 @@
-from . import chat, sessions
+from . import chat, sessions, stream
 
-__all__ = ["chat", "sessions"]
-
+__all__ = ["chat", "sessions", "stream"]
