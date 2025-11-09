@@ -10,7 +10,7 @@ from uuid import uuid4
 from shared.types import AgentRole, SenderRole
 
 from ..config import AgentRegistry
-from ..llm import LLMService
+from ..llm import LLMProviderError, LLMService
 from ..prompts import SYSTEM_PROMPTS
 from ..runtime.executor import AgentDispatch, AgentWorkflow, StreamPublisher, WorkflowContext
 
@@ -235,8 +235,22 @@ class SequentialWorkflow(AgentWorkflow):
         message_id: str,
     ) -> str:
         chunks: list[str] = []
-        async for chunk in self._llm_service.stream_generate(prompt=prompt, provider=provider):
-            chunks.append(chunk)
+        try:
+            async for chunk in self._llm_service.stream_generate(prompt=prompt, provider=provider):
+                chunks.append(chunk)
+                await self._publish_event(
+                    stream_publisher,
+                    session_id,
+                    {
+                        'type': 'token',
+                        'sender': sender,
+                        'agent': agent_name,
+                        'content': chunk,
+                        'message_id': message_id,
+                        'final': False,
+                    },
+                )
+            full_text = ''.join(chunks)
             await self._publish_event(
                 stream_publisher,
                 session_id,
@@ -244,25 +258,26 @@ class SequentialWorkflow(AgentWorkflow):
                     'type': 'token',
                     'sender': sender,
                     'agent': agent_name,
-                    'content': chunk,
+                    'content': full_text,
                     'message_id': message_id,
-                    'final': False,
+                    'final': True,
                 },
             )
-        full_text = ''.join(chunks)
-        await self._publish_event(
-            stream_publisher,
-            session_id,
-            {
-                'type': 'token',
-                'sender': sender,
-                'agent': agent_name,
-                'content': full_text,
-                'message_id': message_id,
-                'final': True,
-            },
-        )
-        return full_text
+            return full_text
+        except LLMProviderError as exc:
+            await self._publish_event(
+                stream_publisher,
+                session_id,
+                {
+                    'type': 'error',
+                    'sender': 'status',
+                    'agent': agent_name,
+                    'content': str(exc),
+                    'message_id': message_id,
+                    'final': True,
+                },
+            )
+            raise
 
     async def _emit_status(
         self,

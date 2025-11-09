@@ -25,7 +25,7 @@ export interface ChatTurn {
 }
 
 export interface StreamEvent {
-  type: 'token' | 'status';
+  type: 'token' | 'status' | 'error';
   sender: SenderRole;
   agent?: AgentRole | null;
   content: string;

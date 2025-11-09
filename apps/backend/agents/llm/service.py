@@ -42,6 +42,12 @@ def _load_local_env() -> None:
 _load_local_env()
 
 
+class LLMProviderError(Exception):
+    """Raised when the underlying LLM provider fails."""
+
+    pass
+
+
 @dataclass
 class LLMConfig:
     """Environment-driven configuration for the agent LLM layer."""
@@ -96,9 +102,8 @@ class LLMService:
             logger.info('LLMService: provider=%s succeeded response_len=%d', provider_name, len(result))
             return result
         except Exception as exc:
-            logger.exception('LLMService: provider=%s failed, falling back to EchoProvider', provider_name, exc_info=exc)
-            fallback = EchoProvider(name='Fallback', model='echo', api_key=None)
-            return await fallback.generate(prompt=prompt, **kwargs)
+            logger.exception('LLMService: provider=%s failed', provider_name, exc_info=exc)
+            raise LLMProviderError(str(exc)) from exc
 
     async def stream_generate(
         self,
@@ -118,8 +123,12 @@ class LLMService:
             yield result
             return
         logger.info('LLMService: streaming via provider=%s model=%s', provider_name, getattr(selected, 'model', 'unknown'))
-        async for chunk in stream_method(prompt=prompt, **kwargs):
-            yield chunk
+        try:
+            async for chunk in stream_method(prompt=prompt, **kwargs):
+                yield chunk
+        except Exception as exc:
+            logger.exception('LLMService: streaming provider=%s failed', provider_name, exc_info=exc)
+            raise LLMProviderError(str(exc)) from exc
 
 
 _LLM_SERVICE: Optional[LLMService] = None

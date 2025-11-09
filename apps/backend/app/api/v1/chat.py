@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies.auth import get_current_user
 from app.models import ChatTurn, Message, MessageCreate, UserProfile
 from app.services import agent_runtime_gateway, session_store
+from agents.llm import LLMProviderError
 
 router = APIRouter()
 
@@ -19,13 +20,16 @@ async def send_message(payload: MessageCreate, user: UserProfile = Depends(get_c
         content=payload.content,
         owner_id=user.id,
     )
-    responses = await agent_runtime_gateway.handle_user_turn(
-        session_id=payload.session_id,
-        owner_id=session.owner_id,
-        user_id=user.id,
-        user_message=payload.content,
-    )
-    return ChatTurn(user=user_message, responses=responses)
+    try:
+        responses = await agent_runtime_gateway.handle_user_turn(
+            session_id=payload.session_id,
+            owner_id=session.owner_id,
+            user_id=user.id,
+            user_message=payload.content,
+        )
+        return ChatTurn(user=user_message, responses=responses)
+    except LLMProviderError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
 
 
 @router.get("/messages/{session_id}", response_model=list[Message])

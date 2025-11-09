@@ -164,6 +164,22 @@ export default function Home() {
         const data = JSON.parse(event.data) as StreamEvent;
         const effectiveSession = data.session_id ?? activeSessionId;
         if (!effectiveSession || effectiveSession !== activeSessionId) return;
+        if (data.type === 'error') {
+          const errorContent = data.content || 'LLM 调用失败，请稍后重试';
+          setError(errorContent);
+          setIsSending(false);
+          setStreamingMessages({});
+          mergeMessages({
+            id: data.message_id,
+            session_id: activeSessionId,
+            sender: 'status',
+            agent: data.agent ?? 'Mike',
+            content: errorContent,
+            timestamp: new Date().toISOString()
+          });
+          return;
+        }
+
         setStreamingMessages((prev) => {
           const baseMessage: Message = prev[data.message_id] ?? {
             id: data.message_id,
