@@ -24,6 +24,16 @@ export interface ChatTurn {
   responses: Message[];
 }
 
+export interface StreamEvent {
+  type: 'token' | 'status';
+  sender: SenderRole;
+  agent?: AgentRole | null;
+  content: string;
+  message_id: string;
+  final: boolean;
+  session_id?: string;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: string;

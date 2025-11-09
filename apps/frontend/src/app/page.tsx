@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { EditorPanel } from '@/components/editor/EditorPanel';
 import { PreviewPanel } from '@/components/preview/PreviewPanel';
-import { createSession, fetchMessages, listSessions, sendMessage } from '@/lib/api/chat';
+import { API_BASE, createSession, fetchMessages, listSessions, sendMessage } from '@/lib/api/chat';
 import { useAuth } from '@/hooks/useAuth';
-import type { Message, Session } from '@/types/chat';
+import type { Message, Session, StreamEvent } from '@/types/chat';
 
 export default function Home() {
   const router = useRouter();
@@ -21,6 +21,8 @@ export default function Home() {
   const [isSending, setIsSending] = useState(false);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [streamingMessages, setStreamingMessages] = useState<Record<string, Message>>({});
+  const [activeRightTab, setActiveRightTab] = useState<'editor' | 'preview'>('editor');
 
   const hasActiveSession = Boolean(sessionId);
 
@@ -50,6 +52,22 @@ export default function Home() {
     loadSessions();
   }, [token]);
 
+  const mergeMessages = useCallback((incoming: Message | Message[]) => {
+    const items = Array.isArray(incoming) ? incoming : [incoming];
+    setMessages((prev) => {
+      const next = [...prev];
+      for (const item of items) {
+        const index = next.findIndex((message) => message.id === item.id);
+        if (index >= 0) {
+          next[index] = item;
+        } else {
+          next.push(item);
+        }
+      }
+      return next;
+    });
+  }, []);
+
   const handleSend = async (content: string) => {
     if (!user || !token) {
       router.push('/login');
@@ -65,7 +83,7 @@ export default function Home() {
         setSessionId(session.id);
       }
       const turn = await sendMessage(token, activeSessionId, content);
-      setMessages((prev) => [...prev, turn.user, ...turn.responses]);
+      mergeMessages([turn.user, ...turn.responses]);
       await loadSessions();
     } catch (err) {
       setError(err instanceof Error ? err.message : '发送失败，请稍后再试');
@@ -93,6 +111,7 @@ export default function Home() {
       const history = await fetchMessages(token, id);
       setSessionId(id);
       setMessages(history);
+      setStreamingMessages({});
     } catch (err) {
       setError(err instanceof Error ? err.message : '加载会话失败');
     } finally {
@@ -106,6 +125,95 @@ export default function Home() {
   };
 
   const recentSessions = useMemo(() => sessions.slice(0, 5), [sessions]);
+
+  useEffect(() => {
+    if (!sessionId) {
+      setStreamingMessages({});
+      return;
+    }
+    const activeSessionId = sessionId;
+    let socket: WebSocket | null = null;
+    let cancelled = false;
+    const resolveWsBase = () => {
+      const configured = process.env.NEXT_PUBLIC_WS_BASE_URL;
+      if (configured) return configured.replace(/\/$/, '');
+
+      try {
+        const apiUrl = new URL(API_BASE);
+        const protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+        return `${protocol}//${apiUrl.host}`;
+      } catch {
+        if (typeof window !== 'undefined') {
+          return window.location.origin.replace(/^http/, 'ws');
+        }
+        return 'ws://127.0.0.1:8000';
+      }
+    };
+    const wsBase = resolveWsBase();
+    const url = `${wsBase}/api/ws/sessions/${activeSessionId}`;
+    try {
+      socket = new WebSocket(url);
+    } catch (err) {
+      console.error('WebSocket connection failed', err);
+      return;
+    }
+
+    socket.onmessage = (event) => {
+      if (cancelled) return;
+      try {
+        const data = JSON.parse(event.data) as StreamEvent;
+        const effectiveSession = data.session_id ?? activeSessionId;
+        if (!effectiveSession || effectiveSession !== activeSessionId) return;
+        setStreamingMessages((prev) => {
+          const baseMessage: Message = prev[data.message_id] ?? {
+            id: data.message_id,
+            session_id: activeSessionId,
+            sender: data.sender,
+            agent: data.agent ?? null,
+            content: '',
+            timestamp: new Date().toISOString()
+          };
+
+          const updated: Message =
+            data.type === 'status'
+              ? {
+                  ...baseMessage,
+                  sender: 'status',
+                  agent: data.agent ?? 'Mike',
+                  content: data.content,
+                  timestamp: new Date().toISOString()
+                }
+              : {
+                  ...baseMessage,
+                  content: baseMessage.content + data.content,
+                  timestamp: new Date().toISOString()
+                };
+
+          if (data.final) {
+            mergeMessages({
+              ...updated,
+              timestamp: new Date().toISOString()
+            });
+            const { [data.message_id]: _removed, ...rest } = prev;
+            return rest;
+          }
+          return { ...prev, [data.message_id]: updated };
+        });
+      } catch (err) {
+        console.error('Failed to parse stream event', err);
+      }
+    };
+
+    socket.onerror = (event) => {
+      console.error('WebSocket error', event);
+    };
+
+    return () => {
+      cancelled = true;
+      setStreamingMessages({});
+      socket?.close();
+    };
+  }, [sessionId, mergeMessages]);
 
   return (
     <main className="workspace">
@@ -182,11 +290,34 @@ export default function Home() {
       ) : (
         <>
           {error && <p className="workspace__error">{error}</p>}
-          <section className="workspace__grid">
-            <ChatPanel sessionId={sessionId} messages={messages} isSending={isSending} onSend={handleSend} />
+         <section className="workspace__grid">
+            <ChatPanel
+              sessionId={sessionId}
+              messages={messages}
+              streamingMessages={Object.values(streamingMessages)}
+              isSending={isSending}
+              onSend={handleSend}
+            />
             <div className="workspace__right">
-              <EditorPanel />
-              <PreviewPanel />
+              <div className="workspace__right-tabs">
+                <button
+                  type="button"
+                  className={activeRightTab === 'editor' ? 'active' : ''}
+                  onClick={() => setActiveRightTab('editor')}
+                >
+                  Editor / Terminal
+                </button>
+                <button
+                  type="button"
+                  className={activeRightTab === 'preview' ? 'active' : ''}
+                  onClick={() => setActiveRightTab('preview')}
+                >
+                  Preview
+                </button>
+              </div>
+              <div className="workspace__right-body">
+                {activeRightTab === 'editor' ? <EditorPanel /> : <PreviewPanel />}
+              </div>
             </div>
           </section>
         </>

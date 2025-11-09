@@ -7,6 +7,7 @@ import type { Message } from '@/types/chat';
 interface ChatPanelProps {
   sessionId?: string;
   messages: Message[];
+  streamingMessages?: Message[];
   isSending: boolean;
   onSend: (content: string) => Promise<void>;
 }
@@ -18,7 +19,7 @@ const labelMap: Record<Message['sender'], string> = {
   status: '状态'
 };
 
-export function ChatPanel({ sessionId, messages, isSending, onSend }: ChatPanelProps) {
+export function ChatPanel({ sessionId, messages, streamingMessages = [], isSending, onSend }: ChatPanelProps) {
   const [draft, setDraft] = useState('');
 
   const handleSend = async () => {
@@ -39,6 +40,10 @@ export function ChatPanel({ sessionId, messages, isSending, onSend }: ChatPanelP
     return 'Agent';
   };
 
+  const displayMessages = [...messages, ...streamingMessages].sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+
   return (
     <section className="chat-panel">
       <header className="chat-panel__header">
@@ -49,8 +54,8 @@ export function ChatPanel({ sessionId, messages, isSending, onSend }: ChatPanelP
       </header>
 
       <div className="chat-panel__messages">
-        {messages.length === 0 && <p className="chat-panel__empty">尚无消息，发送第一条指令吧。</p>}
-        {messages.map((message) => (
+        {displayMessages.length === 0 && <p className="chat-panel__empty">尚无消息，发送第一条指令吧。</p>}
+        {displayMessages.map((message) => (
           <article
             key={message.id}
             className={`chat-panel__message chat-panel__message--${message.sender}`}
