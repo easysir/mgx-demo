@@ -2,11 +2,44 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Dict, Optional
 
-from .providers import LLMProvider, get_builtin_provider
+from .providers import EchoProvider, LLMProvider, get_builtin_provider
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('[LLMService] %(levelname)s %(message)s'))
+    logger.addHandler(handler)
+logger.propagate = False
+
+
+def _load_local_env() -> None:
+    """Load agents/.env so devs don't need to export vars globally."""
+
+    env_path = Path(__file__).resolve().parent.parent / '.env'
+    if not env_path.exists():
+        return
+    try:
+        with env_path.open('r', encoding='utf-8') as handler:
+            for raw_line in handler:
+                line = raw_line.strip()
+                if not line or line.startswith('#') or '=' not in line:
+                    continue
+                key, value = line.split('=', 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                os.environ.setdefault(key, value)
+    except OSError as exc:
+        logger.warning('Failed to load agents/.env: %s', exc)
+
+
+_load_local_env()
 
 
 @dataclass
@@ -23,6 +56,7 @@ class LLMConfig:
     anthropic_api_key: Optional[str] = os.getenv('ANTHROPIC_API_KEY')
     gemini_api_key: Optional[str] = os.getenv('GEMINI_API_KEY')
     ollama_api_key: Optional[str] = os.getenv('OLLAMA_API_KEY')  # 可能不需要，但保留字段
+    enable_logging: bool = True
 
 
 class LLMService:
@@ -50,7 +84,21 @@ class LLMService:
         """Generate text from the selected provider."""
 
         selected = self.get_provider(provider)
-        return await selected.generate(prompt=prompt, **kwargs)
+        provider_name = getattr(selected, 'name', provider or self._config.default_provider)
+        logger.info(
+            'LLMService: invoking provider=%s model=%s prompt_len=%d',
+            provider_name,
+            getattr(selected, 'model', 'unknown'),
+            len(prompt),
+        )
+        try:
+            result = await selected.generate(prompt=prompt, **kwargs)
+            logger.info('LLMService: provider=%s succeeded response_len=%d', provider_name, len(result))
+            return result
+        except Exception as exc:
+            logger.exception('LLMService: provider=%s failed, falling back to EchoProvider', provider_name, exc_info=exc)
+            fallback = EchoProvider(name='Fallback', model='echo', api_key=None)
+            return await fallback.generate(prompt=prompt, **kwargs)
 
 
 _LLM_SERVICE: Optional[LLMService] = None

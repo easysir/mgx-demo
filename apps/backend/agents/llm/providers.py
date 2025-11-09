@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+from openai import AsyncOpenAI, OpenAIError
 
 
 class LLMProvider:
@@ -30,13 +32,46 @@ class EchoProvider(LLMProvider):
         return f"[{self.name}:{self.model}] {prompt}"
 
 
+@dataclass
+class OpenAIProvider(LLMProvider):
+    """Async OpenAI provider using the official SDK."""
+
+    name: str = 'OpenAI'
+    model: str = 'gpt-4o-mini'
+    api_key: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if not self.api_key:
+            raise ValueError('OpenAI API key is required for OpenAIProvider')
+        self._client = AsyncOpenAI(api_key=self.api_key)
+
+    async def generate(self, *, prompt: str, **kwargs: Any) -> str:
+        try:
+            temperature = kwargs.get('temperature', 0.3)
+            completion = await self._client.chat.completions.create(
+                model=self.model,
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=temperature,
+            )
+            content = completion.choices[0].message.content
+            if isinstance(content, list):
+                return ''.join(part['text'] for part in content if isinstance(part, dict) and part.get('text'))
+            return content or ''
+        except OpenAIError as exc:
+            raise RuntimeError(f'OpenAI API error: {exc}') from exc
+
+
 def get_builtin_provider(provider_name: str, *, model: str, api_key: str | None) -> LLMProvider:
     """Factory returning a placeholder provider for the given name."""
 
     normalized = provider_name.lower()
-    if normalized in {'openai', 'anthropic', 'gemini', 'ollama'}:
+    if normalized == 'openai':
+        if api_key:
+            return OpenAIProvider(model=model, api_key=api_key)
+        return EchoProvider(name='OpenAI', model=model, api_key=api_key)
+    if normalized in {'anthropic', 'gemini', 'ollama'}:
         return EchoProvider(name=provider_name.capitalize(), model=model, api_key=api_key)
     raise ValueError(f'Unsupported provider: {provider_name}')
 
 
-__all__ = ['LLMProvider', 'EchoProvider', 'get_builtin_provider']
+__all__ = ['LLMProvider', 'EchoProvider', 'OpenAIProvider', 'get_builtin_provider']

@@ -11,8 +11,9 @@ agents/
 ├── prompts/          # 提示词模板
 ├── tools/            # ToolExecutor 及工具适配层
 ├── llm/              # LLM Service + Provider 适配
-├── workflows/        # Mike 指挥团队的编排策略
-└── runtime/          # Orchestrator，对外暴露统一入口
+├── workflows/        # Mike 指挥动态编排策略
+├── runtime/          # Orchestrator，对外暴露统一入口
+└── .env              # Agent 运行时的局部环境变量（示例：AGENT_LLM_LOGGING=true）
 ```
 
 ### 核心流程
@@ -26,6 +27,7 @@ agents/
 - **Workflow + Orchestrator 解耦**：编排策略集中在 `workflows/`，Orchestrator 只负责调度，便于后续替换为 DAG、状态机或事件驱动模型。
 - **ToolExecutor 抽象**：所有 LLM/编辑器/终端/Git 等操作通过 `tools/` 统一封装，Agent 本身只决定“用哪个工具”，降低耦合。
 - **LLM 接入层**：`llm/service.py` 通过环境变量配置 OpenAI/Anthropic/Gemini/Ollama 等主流模型，现阶段用 EchoProvider 返回可观测结果，方便后续替换为真实 SDK。
+- **调试开关**：在 `agents/.env` 中设置 `AGENT_LLM_LOGGING=true`，启动前执行 `set -a && source apps/backend/agents/.env && set +a` 可开启 LLM 调用日志，便于排查真实链路。
 - **Shared 契约**：`shared/types.py` 暴露 `AgentRole`/`SenderRole` 等常量，Gateway 与 Agents 同源引用，为未来拆成独立微服务奠定基础。
 - **明确的 TODO**：`AgentRuntimeGateway` 和 orchestrator 顶部都写明“可拆分为 RPC/消息队列”的规划，提示后续迁移路径。
 
