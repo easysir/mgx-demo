@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
-AgentRole = Literal['Mike', 'Emma', 'Bob', 'Alex', 'David', 'Iris']
-SenderRole = Literal['user', 'mike', 'agent', 'status']
+from shared.types import AgentRole, SenderRole
 
 
 class Message(BaseModel):

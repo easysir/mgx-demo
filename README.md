@@ -27,6 +27,7 @@ pnpm run setup   # 自动安装 Node 依赖 + 创建 ~/venvs/mgx 并安装后端
 ### 启动
 - 前端：`pnpm run dev:frontend`（Next.js dev server，默认 http://localhost:3000）
 - 后端：`pnpm run dev:backend`（uvicorn + FastAPI，健康检查 http://127.0.0.1:8000/healthz）
+- Agents Runtime：无需单独启动，随 FastAPI 服务一起初始化；当后续拆为独立微服务时再更新启动命令。
 - 前后端并行：`pnpm dev`（Turbo 并行拉起各 dev 命令）
 
 ## 项目约定

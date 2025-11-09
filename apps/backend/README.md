@@ -13,13 +13,22 @@ uv run fastapi dev app.main:app --reload
 ## 目录规划
 
 ```
-app/
-  main.py          # 入口
+app/               # FastAPI 网关与轻量业务逻辑
+  main.py
   api/             # REST / WebSocket 路由
-  agents/          # Agent 实现
-  core/            # LLM、工具、会话、沙箱
-  services/        # 业务服务
+  services/        # 认证、会话、会话存储
+  models/          # Pydantic 模型
+
+agents/            # Agent runtime（未来可拆成独立服务）
+  config/          # Agent 注册表
+  agents/          # 各角色 Agent（LLM/工具逻辑）
+  tools/           # Tool executors
+  workflows/       # Mike 编排策略
+  runtime/         # Orchestrator, workflow 入口
+
+shared/            # app 与 agents 共享的类型定义
 ```
 
-数据库迁移、任务调度、消息队列等模块将在后续迭代引入。
+> TODO: 待 Phase 2 落地真实 LLM/工具接口后，将 `agents/` 抽离为独立微服务，通过 RPC/消息队列与 `app/` 通信。
 
+数据库迁移、任务调度、消息队列等模块将在后续迭代引入。
