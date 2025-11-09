@@ -20,6 +20,7 @@ docs/          # 设计与规范文档
 ### 初始化
 ```bash
 corepack enable
+COREPACK_ENABLE_STRICT=0 corepack prepare pnpm@9.12.2 --activate
 pnpm run setup   # 自动安装 Node 依赖 + 创建 ~/venvs/mgx 并安装后端依赖
 ```
 

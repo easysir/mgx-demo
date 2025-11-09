@@ -2,6 +2,7 @@
 node_modules/
 pnpm-lock.yaml
 .turbo/
+.next/
 
 # Python
 __pycache__/
@@ -19,4 +20,3 @@ dist/
 build/
 .env
 .env.*
-
