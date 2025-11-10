@@ -25,13 +25,14 @@ export interface ChatTurn {
 }
 
 export interface StreamEvent {
-  type: 'token' | 'status' | 'error';
-  sender: SenderRole;
+  type: 'token' | 'status' | 'error' | 'file_change';
+  sender?: SenderRole;
   agent?: AgentRole | null;
-  content: string;
-  message_id: string;
-  final: boolean;
+  content?: string;
+  message_id?: string;
+  final?: boolean;
   session_id?: string;
+  paths?: string[];
 }
 
 export interface TokenResponse {
@@ -46,4 +47,25 @@ export interface UserProfile {
   name: string;
   credits: number;
   plan: string;
+}
+
+export interface FileNode {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size: number;
+  children?: FileNode[];
+}
+
+export interface FileTreeResponse {
+  root: string;
+  entries: FileNode[];
+}
+
+export interface FileContentResponse {
+  name: string;
+  path: string;
+  size: number;
+  modified_at: number;
+  content: string;
 }

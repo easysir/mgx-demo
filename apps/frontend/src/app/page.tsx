@@ -24,6 +24,7 @@ export default function Home() {
   const [streamingMessages, setStreamingMessages] = useState<Record<string, Message>>({});
   const [activeRightTab, setActiveRightTab] = useState<'editor' | 'preview'>('editor');
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [fileVersion, setFileVersion] = useState(0);
 
   const hasActiveSession = Boolean(sessionId);
   const isHomeView = !hasActiveSession && messages.length === 0;
@@ -166,6 +167,11 @@ export default function Home() {
         const data = JSON.parse(event.data) as StreamEvent;
         const effectiveSession = data.session_id ?? activeSessionId;
         if (!effectiveSession || effectiveSession !== activeSessionId) return;
+        if (data.type === 'file_change') {
+          setFileVersion((prev) => prev + 1);
+          return;
+        }
+
         if (data.type === 'error') {
           const errorContent = data.content || 'LLM 调用失败，请稍后重试';
           setError(errorContent);
@@ -265,28 +271,7 @@ export default function Home() {
 
       {isHomeView ? (
         <div className="workspace__home-layout">
-          <section className="workspace__home">
-            <div className="workspace__home-card">
-              <h1>告诉 MGX 你想做什么</h1>
-              <form className="workspace__home-form" onSubmit={handleHomeSubmit}>
-                <div className="workspace__home-input">
-                  <textarea
-                    rows={6}
-                    placeholder="例如：搭建一个带深色导航和作品集的个人网站..."
-                    value={homeDraft}
-                    onChange={(event) => setHomeDraft(event.target.value)}
-                    disabled={isSending}
-                  />
-                  <button type="submit" className="workspace__home-submit" disabled={isSending}>
-                    {isSending ? '生成会话中...' : '确认'}
-                  </button>
-                </div>
-              </form>
-              {error && <p className="workspace__error">{error}</p>}
-            </div>
-          </section>
-
-          <aside
+                    <aside
             className={`workspace__history-sidebar ${isHistoryOpen ? 'open' : 'collapsed'}`}
             aria-label="历史会话"
           >
@@ -319,6 +304,61 @@ export default function Home() {
               )}
             </div>
           </aside>
+          
+          <section className="workspace__home">
+            <div className="workspace__home-card">
+              {/* <h4>告诉 MGX 你想做什么</h4> */}
+              <form className="workspace__home-form" onSubmit={handleHomeSubmit}>
+                <div className="workspace__home-input">
+                  <textarea
+                    rows={6}
+                    placeholder="例如：搭建一个带深色导航和作品集的个人网站..."
+                    value={homeDraft}
+                    onChange={(event) => setHomeDraft(event.target.value)}
+                    disabled={isSending}
+                  />
+                  <button type="submit" className="workspace__home-submit" disabled={isSending}>
+                    {isSending ? '生成会话中...' : '确认'}
+                  </button>
+                </div>
+              </form>
+              {/* {error && <p className="workspace__error">{error}</p>} */}
+            </div>
+          </section>
+
+          {/* <aside
+            className={`workspace__history-sidebar ${isHistoryOpen ? 'open' : 'collapsed'}`}
+            aria-label="历史会话"
+          >
+            <div className="workspace__history-toggle">
+              <div>
+                <span>历史会话</span>
+                {isLoadingSessions && <small>加载中...</small>}
+              </div>
+              <button type="button" onClick={() => setIsHistoryOpen((prev) => !prev)}>
+                {isHistoryOpen ? '收起' : '展开'}
+              </button>
+            </div>
+            <div className="workspace__history-content">
+              {recentSessions.length === 0 ? (
+                <p className="workspace__history-empty">还没有会话记录</p>
+              ) : (
+                <ul className="workspace__history-list">
+                  {recentSessions.map((session) => (
+                    <li key={session.id}>
+                      <div>
+                        <strong>{session.title}</strong>
+                        <small>{new Date(session.created_at).toLocaleString()}</small>
+                      </div>
+                      <button type="button" onClick={() => handleOpenSession(session.id)} disabled={isSending}>
+                        打开
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </aside> */}
         </div>
       ) : (
         <div className="workspace__chat-layout">
@@ -351,7 +391,7 @@ export default function Home() {
                 </button>
               </div>
               <div className="workspace__right-body">
-                {activeRightTab === 'editor' ? <EditorPanel /> : <PreviewPanel />}
+                {activeRightTab === 'editor' ? <EditorPanel sessionId={sessionId} fileVersion={fileVersion} /> : <PreviewPanel />}
               </div>
             </div>
           </div>

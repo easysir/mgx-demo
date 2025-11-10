@@ -1,64 +1,102 @@
-const files = [
-  { path: 'pages/index.tsx', status: 'modified' },
-  { path: 'components/Hero.tsx', status: 'added' },
-  { path: 'styles/global.css', status: 'synced' },
-  { path: 'agents/plan.md', status: 'review' }
-];
+'use client';
 
-const sampleCode = `export default function HeroSection() {
-  return (
-    <section className="hero">
-      <div className="hero__badge">MGX Workspace</div>
-      <h1>AI 团队，帮你 10x 完成前端迭代</h1>
-      <p>一句话描述目标，Mike 带队完成需求分析、架构设计、编码和预览。</p>
-      <button>立即开始</button>
-    </section>
-  );
-}`;
+import { useEffect, useState } from 'react';
 
-export function EditorPanel() {
+import { fetchFileContent, fetchFileTree } from '@/lib/api/chat';
+import { useAuth } from '@/hooks/useAuth';
+import type { FileContentResponse, FileNode } from '@/types/chat';
+
+import { FileExplorer } from './FileExplorer';
+import { CodePreview } from './CodePreview';
+
+interface EditorPanelProps {
+  sessionId?: string;
+  fileVersion: number;
+}
+
+export function EditorPanel({ sessionId, fileVersion }: EditorPanelProps) {
+  const { token } = useAuth();
+  const [tree, setTree] = useState<FileNode[]>([]);
+  const [isTreeLoading, setIsTreeLoading] = useState(false);
+  const [activeFile, setActiveFile] = useState<FileContentResponse | null>(null);
+  const [activePath, setActivePath] = useState<string | null>(null);
+  const [isFileLoading, setIsFileLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const canLoad = Boolean(token && sessionId);
+
+  const loadTree = async () => {
+    if (!canLoad) return;
+    setIsTreeLoading(true);
+    setError(null);
+    try {
+      const data = await fetchFileTree(token!, sessionId!, { depth: 3 });
+      setTree(data.entries);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载文件树失败');
+    } finally {
+      setIsTreeLoading(false);
+    }
+  };
+
+  const loadFile = async (path: string) => {
+    if (!canLoad) return;
+    setIsFileLoading(true);
+    setError(null);
+    try {
+      const file = await fetchFileContent(token!, sessionId!, path);
+      setActiveFile(file);
+      setActivePath(path);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '加载文件失败');
+    } finally {
+      setIsFileLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setTree([]);
+    setActiveFile(null);
+    setActivePath(null);
+    if (canLoad) {
+      loadTree();
+    }
+  }, [sessionId, token]);
+
+  useEffect(() => {
+    if (!canLoad) return;
+    loadTree();
+    if (activePath) {
+      loadFile(activePath);
+    }
+  }, [fileVersion]);
+
   return (
     <section className="editor-panel">
-      <header className="editor-panel__header">
+      {/* <header className="editor-panel__header">
         <div>
-          <p className="eyebrow">文件 / 代码</p>
-          <h2>Editor + Terminal</h2>
+          <p className="eyebrow">沙箱文件</p>
+          <h2>Editor (只读)</h2>
         </div>
-        <div className="editor-panel__tabs">
-          <button className="active">pages/index.tsx</button>
-          <button>app/layout.tsx</button>
-          <button>tailwind.config.ts</button>
-        </div>
-      </header>
+        <button type="button" onClick={loadTree} disabled={isTreeLoading || !canLoad}>
+          {isTreeLoading ? '刷新中...' : '刷新文件树'}
+        </button>
+      </header> */}
+
+      {error && <p className="workspace__error">{error}</p>}
 
       <div className="editor-panel__body">
-        <aside>
-          <p className="editor-panel__section-title">文件树</p>
-          <ul>
-            {files.map((file) => (
-              <li key={file.path}>
-                <span>{file.path}</span>
-                <small>{file.status}</small>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
+        <FileExplorer
+          tree={tree}
+          loading={isTreeLoading}
+          onRefresh={loadTree}
+          onSelect={(node) => loadFile(node.path)}
+          activePath={activePath ?? undefined}
+        />
         <div className="editor-panel__code">
-          <pre>
-            <code>{sampleCode}</code>
-          </pre>
+          <CodePreview file={activeFile} loading={isFileLoading} />
         </div>
       </div>
-
-      <footer className="editor-panel__footer">
-        <div>
-          <p className="editor-panel__section-title">终端</p>
-          <code>npm run dev · port 3000</code>
-        </div>
-        <button type="button">打开终端</button>
-      </footer>
     </section>
   );
 }
-

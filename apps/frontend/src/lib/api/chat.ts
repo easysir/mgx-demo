@@ -1,4 +1,12 @@
-import { ChatTurn, Message, Session, TokenResponse, UserProfile } from '@/types/chat';
+import {
+  ChatTurn,
+  Message,
+  Session,
+  TokenResponse,
+  UserProfile,
+  FileTreeResponse,
+  FileContentResponse
+} from '@/types/chat';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000/api';
 
@@ -46,6 +54,26 @@ export async function sendMessage(token: string, sessionId: string, content: str
     body: JSON.stringify({ session_id: sessionId, content })
   });
   return handleResponse<ChatTurn>(response);
+}
+
+export async function fetchFileTree(
+  token: string,
+  sessionId: string,
+  params: { root?: string; depth?: number; includeHidden?: boolean } = {}
+): Promise<FileTreeResponse> {
+  const query = new URLSearchParams();
+  if (params.root) query.set('root', params.root);
+  if (params.depth) query.set('depth', String(params.depth));
+  if (params.includeHidden) query.set('include_hidden', 'true');
+  const url = `${API_BASE}/files/${sessionId}/tree${query.size ? `?${query.toString()}` : ''}`;
+  const response = await fetch(url, { headers: authHeaders(token) });
+  return handleResponse<FileTreeResponse>(response);
+}
+
+export async function fetchFileContent(token: string, sessionId: string, path: string): Promise<FileContentResponse> {
+  const url = `${API_BASE}/files/${sessionId}?${new URLSearchParams({ path }).toString()}`;
+  const response = await fetch(url, { headers: authHeaders(token) });
+  return handleResponse<FileContentResponse>(response);
 }
 
 export async function login(email: string, password: string): Promise<TokenResponse> {

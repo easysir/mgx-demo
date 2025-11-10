@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from app.dependencies.auth import get_current_user
 from app.models import Message, SessionCreate, SessionResponse, UserProfile
 from app.services.store import session_store
+from app.services import container_manager, SandboxError, file_watcher_manager
 
 router = APIRouter()
 
@@ -19,6 +20,13 @@ async def create_session(
 ) -> SessionResponse:
     """Create a new chat session."""
     session = session_store.create_session(owner_id=user.id, payload=payload)
+    try:
+        instance = container_manager.ensure_session_container(session_id=session.id, owner_id=user.id)
+        file_watcher_manager.ensure_watch(session.id, instance.workspace_path)
+    except SandboxError as exc:
+        session_store.delete_session(session.id)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     return session
 
 

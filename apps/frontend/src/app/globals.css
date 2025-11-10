@@ -203,7 +203,10 @@ body {
 }
 
 .workspace__home-form {
+  max-width: 800px;
   width: 100%;
+  margin: 0 auto;
+  margin-top: 150px;
 }
 
 .workspace__home-input {
@@ -324,6 +327,7 @@ body {
   align-items: center;
   gap: 0.75rem;
 }
+
 
 .workspace__user {
   display: flex;
@@ -541,60 +545,106 @@ button:disabled {
 }
 
 .editor-panel__body {
-  display: grid;
-  grid-template-columns: 220px 1fr;
+  display: flex;
   gap: 1rem;
-  min-height: 0;
-  flex: 1;
+  min-height: 480px;
+  height: 100%;
 }
 
-.editor-panel__body aside {
-  background: #f8fafc;
-  border-radius: 16px;
-  padding: 1rem;
+.file-explorer {
+  width: 240px;
+  border-right: 1px solid #e2e8f0;
+  padding-right: 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  max-height: 100%;
 }
 
-.editor-panel__section-title {
-  margin: 0 0 0.4rem;
-  font-size: 0.85rem;
-  opacity: 0.7;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.file-explorer__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
 }
 
-.editor-panel__body ul {
+.file-explorer__empty {
+  margin: 0;
+  color: #94a3b8;
+}
+
+.file-explorer ul {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  font-size: 0.85rem;
+  gap: 0.4rem;
+  overflow-y: auto;
 }
 
-.editor-panel__body li {
+.file-node {
   display: flex;
   justify-content: space-between;
-  gap: 0.5rem;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.file-node button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: inherit;
+  color: inherit;
+}
+
+.file-node.active button {
+  font-weight: 600;
+  color: #6366f1;
+}
+
+.file-node__meta {
+  font-size: 0.75rem;
+  color: #94a3b8;
 }
 
 .editor-panel__code {
-  background: #0f172a;
-  border-radius: 16px;
-  padding: 1rem;
-  overflow: auto;
-  border: 1px solid rgba(15, 23, 42, 0.3);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
 }
 
-.editor-panel__code pre {
-  margin: 0;
+.code-preview {
+  flex: 1;
+  background: #0b1532;
+  border-radius: 16px;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  font-size: 0.9rem;
-  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+}
+
+.code-preview__header h3 {
+  color: #e2e8f0;
+  margin: 0;
+}
+
+.code-preview__body {
+  flex: 1;
+  overflow: auto;
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.code-preview__body pre,
+.code-preview__body code {
+  margin: 0;
   white-space: pre-wrap;
+  color: #f1f5f9;
 }
 
 .editor-panel__footer {

@@ -62,4 +62,7 @@ class SessionStore:
         session.messages.append(message)
         return message
 
+    def delete_session(self, session_id: str) -> None:
+        self._sessions.pop(session_id, None)
+
 session_store = SessionStore()
