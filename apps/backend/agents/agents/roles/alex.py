@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-from ..base import AgentContext, BaseAgent, AgentRunResult, StreamPublisher
+from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
 from ...prompts import ALEX_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 
@@ -29,7 +29,7 @@ class AlexAgent(BaseAgent):
         raw = await self._llm.generate(prompt=prompt, provider='deepseek')
         files = self._extract_file_blocks(raw)
         if not files or not context.tools:
-            return await self._finalize_result(raw, stream_publisher)
+            return await self._emit_final_message(content=raw, sender='agent', stream_publisher=stream_publisher)
 
         applied = []
         for spec in files:
@@ -52,24 +52,7 @@ class AlexAgent(BaseAgent):
         summary = raw
         if applied:
             summary += '\n\n[文件写入]\n' + '\n'.join(f"- {path}" for path in applied)
-        return await self._finalize_result(summary, stream_publisher)
-
-    async def _finalize_result(
-        self, content: str, stream_publisher: StreamPublisher | None
-    ) -> AgentRunResult:
-        message_id = self._new_message_id()
-        if stream_publisher:
-            await stream_publisher(
-                {
-                    'type': 'token',
-                    'sender': 'agent',
-                    'agent': self.name,
-                    'content': content,
-                    'message_id': message_id,
-                    'final': True,
-                }
-            )
-        return AgentRunResult(agent=self.name, sender='agent', content=content, message_id=message_id)
+        return await self._emit_final_message(content=summary, sender='agent', stream_publisher=stream_publisher)
 
     def _extract_file_blocks(self, text: str) -> List[Dict[str, Any]]:
         specs: List[Dict[str, Any]] = []

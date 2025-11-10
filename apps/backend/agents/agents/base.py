@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from shared.types import AgentRole, SenderRole
 
-from ..llm import get_llm_service, LLMProviderError
+from ..llm import LLMProviderError, get_llm_service
 from ..tools import ToolExecutor
 
 StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]
@@ -77,6 +77,7 @@ class BaseAgent:
         provider: str,
         sender: SenderRole,
         stream_publisher: Optional[StreamPublisher],
+        final_transform: Optional[Callable[[str], str]] = None,
     ) -> AgentRunResult:
         """统一的 LLM 流式封装，方便各角色直接调用。"""
 
@@ -97,18 +98,19 @@ class BaseAgent:
                         }
                     )
             full_text = ''.join(chunks)
+            final_text = final_transform(full_text) if final_transform else full_text
             if stream_publisher:
                 await stream_publisher(
                     {
                         'type': 'token',
                         'sender': sender,
                         'agent': self.name,
-                        'content': full_text,
+                        'content': final_text,
                         'message_id': message_id,
                         'final': True,
                     }
                 )
-            return AgentRunResult(agent=self.name, sender=sender, content=full_text, message_id=message_id)
+            return AgentRunResult(agent=self.name, sender=sender, content=final_text, message_id=message_id)
         except LLMProviderError as exc:
             if stream_publisher:
                 await stream_publisher(
@@ -122,6 +124,27 @@ class BaseAgent:
                     }
                 )
             raise
+
+    async def _emit_final_message(
+        self,
+        *,
+        content: str,
+        sender: SenderRole,
+        stream_publisher: Optional[StreamPublisher],
+    ) -> AgentRunResult:
+        message_id = self._new_message_id()
+        if stream_publisher:
+            await stream_publisher(
+                {
+                    'type': 'token',
+                    'sender': sender,
+                    'agent': self.name,
+                    'content': content,
+                    'message_id': message_id,
+                    'final': True,
+                }
+            )
+        return AgentRunResult(agent=self.name, sender=sender, content=content, message_id=message_id)
 
     def _new_message_id(self) -> str:
         return str(uuid4())

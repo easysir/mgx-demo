@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
 from shared.types import AgentRole
@@ -47,8 +47,7 @@ class SequentialWorkflow(AgentWorkflow):
         dispatches: list[AgentDispatch] = []
         available_agents = [agent for agent in AGENT_EXECUTION_ORDER if registry.is_enabled(agent)]
         agent_context = self._build_agent_context(context)
-        visited_agents: list[AgentRole] = []
-        last_agent_output: Optional[str] = None
+        agent_contributions: list[Tuple[AgentRole, str]] = []
 
         await self._emit_status(
             dispatches,
@@ -75,8 +74,7 @@ class SequentialWorkflow(AgentWorkflow):
 
             agent_result = await self._run_agent(next_agent, agent_context, stream_publisher)
             dispatches.append(self._dispatch_from_result(agent_result))
-            visited_agents.append(next_agent)
-            last_agent_output = agent_result.content
+            agent_contributions.append((next_agent, agent_result.content))
 
             available_agents = [agent for agent in available_agents if agent != next_agent]
             review_result = await self._mike_agent.review_agent_output(
@@ -97,7 +95,9 @@ class SequentialWorkflow(AgentWorkflow):
             stream_publisher,
         )
         summary_result = await self._mike_agent.summarize_team(
-            agent_context, visited_agents, last_agent_output, stream_publisher
+            agent_context,
+            agent_contributions,
+            stream_publisher,
         )
         dispatches.append(self._dispatch_from_result(summary_result))
         return dispatches
