@@ -79,22 +79,30 @@ body {
 }
 
 .workspace {
-  padding: 2.5rem;
+  padding: 7rem 1.5rem 2rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  max-width: 1400px;
-  margin: 0 auto;
+  width: 100%;
+  margin: 0;
   min-height: 100vh;
 }
 
-.workspace__home {
+.workspace__home-layout {
   display: flex;
-  justify-content: center;
+  gap: 1.5rem;
+  width: 100%;
+  min-height: calc(100vh - 7rem);
+}
+
+.workspace__home {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
 }
 
 .workspace__home-card {
-  width: min(720px, 100%);
+  width: 100%;
   background: #ffffff;
   border-radius: 20px;
   border: 1px solid #e2e8f0;
@@ -104,19 +112,63 @@ body {
   gap: 1rem;
 }
 
-.workspace__history {
-  border-top: 1px solid #e2e8f0;
-  padding-top: 1rem;
+.workspace__history-sidebar {
+  width: 320px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  transition: width 0.2s ease;
+  position: sticky;
+  top: 6rem;
+  height: calc(100vh - 7rem);
+  overflow: hidden;
+}
+
+.workspace__history-sidebar.collapsed {
+  width: 72px;
+  padding: 1.5rem 0.75rem;
+}
+
+.workspace__history-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.workspace__history-toggle > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.9rem;
+  color: #475569;
+}
+
+.workspace__history-toggle button {
+  border: none;
+  background: #eef2ff;
+  color: #4c1d95;
+  border-radius: 999px;
+  padding: 0.25rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.workspace__history-content {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  flex: 1;
+  overflow-y: auto;
 }
 
-.workspace__history-header {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.9rem;
-  color: #475569;
+.workspace__history-sidebar.collapsed .workspace__history-content {
+  display: none;
 }
 
 .workspace__history-list {
@@ -151,12 +203,14 @@ body {
 }
 
 .workspace__home-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  width: 100%;
 }
 
-.workspace__home-form textarea {
+.workspace__home-input {
+  position: relative;
+}
+
+.workspace__home-input textarea {
   width: 100%;
   border-radius: 16px;
   border: 1px solid #cbd5f5;
@@ -166,6 +220,57 @@ body {
   font-family: inherit;
   font-size: 1rem;
   resize: none;
+  min-height: 220px;
+  padding-right: 7rem;
+}
+
+.workspace__home-submit {
+  position: absolute;
+  bottom: 1.25rem;
+  right: 1.25rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+  padding: 0.65rem 1.5rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(99, 102, 241, 0.3);
+}
+
+.workspace__home-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.workspace__chat-layout {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+  min-height: calc(100vh - 7rem);
+}
+
+.workspace__chat-sidebar {
+  width: 380px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 6rem;
+  height: calc(100vh - 7rem);
+  display: flex;
+}
+
+.workspace__chat-sidebar .chat-panel {
+  width: 100%;
+  height: 100%;
+}
+
+.workspace__chat-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  width: 100%;
 }
 
 .workspace__error {
@@ -178,10 +283,15 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1.5rem;
-  border-radius: 20px;
+  padding: 1rem 2.5rem;
   background: #ffffff;
-  border: 1px solid #e2e8f0;
+  border-bottom: 1px solid #e2e8f0;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 100;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.05);
 }
 
 .workspace__nav-left {
@@ -250,6 +360,8 @@ body {
   background: #ffffff;
   padding: 1.5rem;
   min-height: 0;
+  flex: 1;
+  width: 100%;
 }
 
 .workspace__right-tabs {
@@ -528,8 +640,30 @@ button:disabled {
 }
 
 @media (max-width: 1100px) {
-  .workspace__grid {
-    grid-template-columns: 1fr;
+  .workspace {
+    padding: 6rem 1.5rem 1.5rem;
+  }
+
+  .workspace__home-layout,
+  .workspace__chat-layout {
+    flex-direction: column;
+    min-height: auto;
+  }
+
+  .workspace__history-sidebar,
+  .workspace__chat-sidebar {
+    width: 100%;
+    position: static;
+    height: auto;
+  }
+
+  .workspace__history-sidebar.collapsed {
+    width: 100%;
+    padding: 1.5rem;
+  }
+
+  .workspace__chat-sidebar {
+    order: 2;
   }
 
   .chat-panel {

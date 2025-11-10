@@ -23,8 +23,10 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [streamingMessages, setStreamingMessages] = useState<Record<string, Message>>({});
   const [activeRightTab, setActiveRightTab] = useState<'editor' | 'preview'>('editor');
+  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
 
   const hasActiveSession = Boolean(sessionId);
+  const isHomeView = !hasActiveSession && messages.length === 0;
 
   const loadSessions = async () => {
     if (!token) {
@@ -232,7 +234,7 @@ export default function Home() {
   }, [sessionId, mergeMessages]);
 
   return (
-    <main className="workspace">
+    <main className={`workspace ${isHomeView ? 'workspace--home' : 'workspace--chat'}`}>
       <header className="workspace__nav">
         <div className="workspace__nav-left">
           <button className="workspace__logo" onClick={handleBackHome}>
@@ -261,27 +263,43 @@ export default function Home() {
         </div>
       </header>
 
-      {!hasActiveSession && messages.length === 0 ? (
-        <section className="workspace__home">
-          <div className="workspace__home-card">
-            <h1>告诉 MGX 你想做什么</h1>
-            <form className="workspace__home-form" onSubmit={handleHomeSubmit}>
-              <textarea
-                rows={4}
-                placeholder="例如：搭建一个带深色导航和作品集的个人网站..."
-                value={homeDraft}
-                onChange={(event) => setHomeDraft(event.target.value)}
-                disabled={isSending}
-              />
-              <button type="submit" disabled={isSending}>
-                {isSending ? '生成会话中...' : '发送需求'}
-              </button>
-            </form>
-            <div className="workspace__history">
-              <div className="workspace__history-header">
+      {isHomeView ? (
+        <div className="workspace__home-layout">
+          <section className="workspace__home">
+            <div className="workspace__home-card">
+              <h1>告诉 MGX 你想做什么</h1>
+              <form className="workspace__home-form" onSubmit={handleHomeSubmit}>
+                <div className="workspace__home-input">
+                  <textarea
+                    rows={6}
+                    placeholder="例如：搭建一个带深色导航和作品集的个人网站..."
+                    value={homeDraft}
+                    onChange={(event) => setHomeDraft(event.target.value)}
+                    disabled={isSending}
+                  />
+                  <button type="submit" className="workspace__home-submit" disabled={isSending}>
+                    {isSending ? '生成会话中...' : '确认'}
+                  </button>
+                </div>
+              </form>
+              {error && <p className="workspace__error">{error}</p>}
+            </div>
+          </section>
+
+          <aside
+            className={`workspace__history-sidebar ${isHistoryOpen ? 'open' : 'collapsed'}`}
+            aria-label="历史会话"
+          >
+            <div className="workspace__history-toggle">
+              <div>
                 <span>历史会话</span>
                 {isLoadingSessions && <small>加载中...</small>}
               </div>
+              <button type="button" onClick={() => setIsHistoryOpen((prev) => !prev)}>
+                {isHistoryOpen ? '收起' : '展开'}
+              </button>
+            </div>
+            <div className="workspace__history-content">
               {recentSessions.length === 0 ? (
                 <p className="workspace__history-empty">还没有会话记录</p>
               ) : (
@@ -300,12 +318,11 @@ export default function Home() {
                 </ul>
               )}
             </div>
-            {error && <p className="workspace__error">{error}</p>}
-          </div>
-        </section>
+          </aside>
+        </div>
       ) : (
-        <>
-          <section className="workspace__grid">
+        <div className="workspace__chat-layout">
+          <aside className="workspace__chat-sidebar">
             <ChatPanel
               sessionId={sessionId}
               messages={messages}
@@ -314,6 +331,8 @@ export default function Home() {
               error={error}
               onSend={handleSend}
             />
+          </aside>
+          <div className="workspace__chat-main">
             <div className="workspace__right">
               <div className="workspace__right-tabs">
                 <button
@@ -335,8 +354,8 @@ export default function Home() {
                 {activeRightTab === 'editor' ? <EditorPanel /> : <PreviewPanel />}
               </div>
             </div>
-          </section>
-        </>
+          </div>
+        </div>
       )}
     </main>
   );
