@@ -52,16 +52,18 @@ class LLMProviderError(Exception):
 class LLMConfig:
     """Environment-driven configuration for the agent LLM layer."""
 
-    default_provider: str = os.getenv('AGENT_LLM_PROVIDER', 'openai')
+    default_provider: str = os.getenv('AGENT_LLM_PROVIDER', 'deepseek')
     openai_model: str = os.getenv('AGENT_LLM_OPENAI_MODEL', 'gpt-4o-mini')
     anthropic_model: str = os.getenv('AGENT_LLM_ANTHROPIC_MODEL', 'claude-3-5-sonnet')
     gemini_model: str = os.getenv('AGENT_LLM_GEMINI_MODEL', 'gemini-1.5-pro')
     ollama_model: str = os.getenv('AGENT_LLM_OLLAMA_MODEL', 'llama3.1')
+    deepseek_model: str = os.getenv('AGENT_LLM_DEEPSEEK_MODEL', 'deepseek-chat')
 
     openai_api_key: Optional[str] = os.getenv('OPENAI_API_KEY')
     anthropic_api_key: Optional[str] = os.getenv('ANTHROPIC_API_KEY')
     gemini_api_key: Optional[str] = os.getenv('GEMINI_API_KEY')
     ollama_api_key: Optional[str] = os.getenv('OLLAMA_API_KEY')  # 可能不需要，但保留字段
+    deepseek_api_key: Optional[str] = os.getenv('DEEPSEEK_API_KEY')
     enable_logging: bool = True
 
 
@@ -77,6 +79,7 @@ class LLMService:
             ),
             'gemini': get_builtin_provider('gemini', model=config.gemini_model, api_key=config.gemini_api_key),
             'ollama': get_builtin_provider('ollama', model=config.ollama_model, api_key=config.ollama_api_key),
+            'deepseek': get_builtin_provider('deepseek', model=config.deepseek_model, api_key=config.deepseek_api_key),
         }
 
     def get_provider(self, name: Optional[str] = None) -> LLMProvider:

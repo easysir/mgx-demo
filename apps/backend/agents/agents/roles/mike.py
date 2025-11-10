@@ -17,4 +17,4 @@ class MikeAgent(BaseAgent):
 
     async def act(self, context: AgentContext) -> str:
         prompt = MIKE_SYSTEM_PROMPT.format(user_message=context.user_message)
-        return await self._llm.generate(prompt=prompt, provider='openai')
+        return await self._llm.generate(prompt=prompt, provider='deepseek')

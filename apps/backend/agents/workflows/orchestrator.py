@@ -16,12 +16,12 @@ from ..runtime.executor import AgentDispatch, AgentWorkflow, StreamPublisher, Wo
 
 AGENT_EXECUTION_ORDER: List[AgentRole] = ['Emma', 'Bob', 'Alex', 'David', 'Iris']
 AGENT_PROVIDERS: Dict[AgentRole, str] = {
-    'Mike': 'openai',
-    'Emma': 'openai',
-    'Bob': 'anthropic',
-    'Alex': 'gemini',
-    'David': 'openai',
-    'Iris': 'ollama',
+    'Mike': 'deepseek',
+    'Emma': 'deepseek',
+    'Bob': 'deepseek',
+    'Alex': 'deepseek',
+    'David': 'deepseek',
+    'Iris': 'deepseek',
 }
 FINISH_TOKENS = {'finish', '完成', '结束', 'done', 'complete'}
 

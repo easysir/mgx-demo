@@ -39,7 +39,7 @@ pnpm run setup   # 自动安装 Node 依赖 + 创建 ~/venvs/mgx 并安装后端
 ## Agent Runtime 亮点
 
 - **配置化角色 + 动态编排**：`agents/config/registry.py` 注册所有角色及默认工具，`workflows/orchestrator.py` 由 Mike 驱动的状态机根据 LLM 决策实时指派下一位 Agent 并收尾，便于扩编或替换流程。
-- **流式执行链路**：`LLMService` 接入 OpenAI 官方 SDK（可扩展其它 provider），异常统一抛出，token/status/error 通过 `/api/ws/sessions/{id}` WebSocket 推送，让 ChatUI 实时刷新。
+- **流式执行链路**：`LLMService` 现已默认走 Deepseek（`DEEPSEEK_API_KEY` / `AGENT_LLM_DEEPSEEK_MODEL`），未配置时自动回退到占位响应；仍可按需自定义其它 provider。异常统一抛出，token/status/error 通过 `/api/ws/sessions/{id}` WebSocket 推送，让 ChatUI 实时刷新。
 - **统一会话接口**：`SessionStore`（MVP 阶段为内存实现）负责记录当前会话，REST 历史接口与流式事件共享 message_id，方便刷新或追踪；后续会替换为 PostgreSQL/Redis 持久化。
 
 ## 项目约定
