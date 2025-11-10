@@ -6,11 +6,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Awaitable, Callable, Dict, Optional
+from uuid import uuid4
 
-from shared.types import AgentRole
+from shared.types import AgentRole, SenderRole
 
+from ..llm import get_llm_service, LLMProviderError
 from ..tools import ToolExecutor
+
+StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class AgentRunResult:
+    """标准化的 Agent 执行结果，方便 orchestrator 统一落盘。"""
+
+    agent: AgentRole
+    sender: SenderRole
+    content: str
+    message_id: str
 
 
 @dataclass
@@ -39,15 +53,75 @@ class BaseAgent:
     def __init__(self, *, name: AgentRole, description: str) -> None:
         self.name = name
         self.description = description
+        self._llm = get_llm_service()
 
     async def plan(self, context: AgentContext) -> str:
         """Optional planning step before执行工具。"""
         raise NotImplementedError
 
-    async def act(self, context: AgentContext) -> str:
+    async def act(
+        self, context: AgentContext, stream_publisher: Optional[StreamPublisher] = None
+    ) -> AgentRunResult:
         """Execute核心逻辑，例如调用LLM或工具。"""
         raise NotImplementedError
 
     async def report(self, context: AgentContext, result: str) -> str:
         """整理输出给 Mike/用户。"""
         return result
+
+    async def _stream_llm_response(
+        self,
+        *,
+        context: AgentContext,
+        prompt: str,
+        provider: str,
+        sender: SenderRole,
+        stream_publisher: Optional[StreamPublisher],
+    ) -> AgentRunResult:
+        """统一的 LLM 流式封装，方便各角色直接调用。"""
+
+        message_id = self._new_message_id()
+        chunks: list[str] = []
+        try:
+            async for chunk in self._llm.stream_generate(prompt=prompt, provider=provider):
+                chunks.append(chunk)
+                if stream_publisher:
+                    await stream_publisher(
+                        {
+                            'type': 'token',
+                            'sender': sender,
+                            'agent': self.name,
+                            'content': chunk,
+                            'message_id': message_id,
+                            'final': False,
+                        }
+                    )
+            full_text = ''.join(chunks)
+            if stream_publisher:
+                await stream_publisher(
+                    {
+                        'type': 'token',
+                        'sender': sender,
+                        'agent': self.name,
+                        'content': full_text,
+                        'message_id': message_id,
+                        'final': True,
+                    }
+                )
+            return AgentRunResult(agent=self.name, sender=sender, content=full_text, message_id=message_id)
+        except LLMProviderError as exc:
+            if stream_publisher:
+                await stream_publisher(
+                    {
+                        'type': 'error',
+                        'sender': 'status',
+                        'agent': self.name,
+                        'content': str(exc),
+                        'message_id': message_id,
+                        'final': True,
+                    }
+                )
+            raise
+
+    def _new_message_id(self) -> str:
+        return str(uuid4())

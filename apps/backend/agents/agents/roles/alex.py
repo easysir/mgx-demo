@@ -3,8 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-from ..base import AgentContext, BaseAgent
-from ...llm import get_llm_service
+from ..base import AgentContext, BaseAgent, AgentRunResult, StreamPublisher
 from ...prompts import ALEX_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 
@@ -19,17 +18,18 @@ class AlexAgent(BaseAgent):
 
     def __init__(self) -> None:
         super().__init__(name='Alex', description='Engineer')
-        self._llm = get_llm_service()
 
     async def plan(self, context: AgentContext) -> str:
         return 'Alex 正在拆解开发任务与工具调用顺序。'
 
-    async def act(self, context: AgentContext) -> str:
+    async def act(
+        self, context: AgentContext, stream_publisher: StreamPublisher | None = None
+    ) -> AgentRunResult:
         prompt = ALEX_SYSTEM_PROMPT.format(user_message=context.user_message)
         raw = await self._llm.generate(prompt=prompt, provider='deepseek')
         files = self._extract_file_blocks(raw)
         if not files or not context.tools:
-            return raw
+            return await self._finalize_result(raw, stream_publisher)
 
         applied = []
         for spec in files:
@@ -52,7 +52,24 @@ class AlexAgent(BaseAgent):
         summary = raw
         if applied:
             summary += '\n\n[文件写入]\n' + '\n'.join(f"- {path}" for path in applied)
-        return summary
+        return await self._finalize_result(summary, stream_publisher)
+
+    async def _finalize_result(
+        self, content: str, stream_publisher: StreamPublisher | None
+    ) -> AgentRunResult:
+        message_id = self._new_message_id()
+        if stream_publisher:
+            await stream_publisher(
+                {
+                    'type': 'token',
+                    'sender': 'agent',
+                    'agent': self.name,
+                    'content': content,
+                    'message_id': message_id,
+                    'final': True,
+                }
+            )
+        return AgentRunResult(agent=self.name, sender='agent', content=content, message_id=message_id)
 
     def _extract_file_blocks(self, text: str) -> List[Dict[str, Any]]:
         specs: List[Dict[str, Any]] = []

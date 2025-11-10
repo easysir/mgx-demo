@@ -3,7 +3,12 @@ from .bob import BOB_SYSTEM_PROMPT
 from .david import DAVID_SYSTEM_PROMPT
 from .emma import EMMA_SYSTEM_PROMPT
 from .iris import IRIS_SYSTEM_PROMPT
-from .mike import MIKE_SYSTEM_PROMPT
+from .mike import (
+    MIKE_SYSTEM_PROMPT,
+    MIKE_PLAN_PROMPT,
+    MIKE_REVIEW_PROMPT,
+    MIKE_SUMMARY_PROMPT,
+)
 
 SYSTEM_PROMPTS = {
     'Mike': MIKE_SYSTEM_PROMPT,
@@ -21,5 +26,8 @@ __all__ = [
     'EMMA_SYSTEM_PROMPT',
     'IRIS_SYSTEM_PROMPT',
     'MIKE_SYSTEM_PROMPT',
+    'MIKE_PLAN_PROMPT',
+    'MIKE_REVIEW_PROMPT',
+    'MIKE_SUMMARY_PROMPT',
     'SYSTEM_PROMPTS',
 ]

@@ -1,6 +1,5 @@
 from .executor import AgentDispatch, AgentExecutor, WorkflowContext
 from ..config import default_registry
-from ..llm import get_llm_service
 from ..workflows.orchestrator import SequentialWorkflow
 
 _ORCHESTRATOR: AgentExecutor | None = None
@@ -12,7 +11,7 @@ def get_agent_orchestrator() -> AgentExecutor:
     if _ORCHESTRATOR is None:
         _ORCHESTRATOR = AgentExecutor(
             registry=default_registry,
-            workflow=SequentialWorkflow(llm_service=get_llm_service()),
+            workflow=SequentialWorkflow(),
         )
     return _ORCHESTRATOR
 
