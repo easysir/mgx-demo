@@ -1,6 +1,11 @@
 # MGX Monorepo
 
-这一仓库采用 monorepo 结构，集中管理 MGX MVP 的后端、前端以及共享模块。顶层通过 pnpm workspace + Turborepo 协调多语言项目，便于统一脚本、缓存和依赖治理。
+## 功能概述
+
+MGX 是一套“对话式研发工作台”，用户只需在 Chat 面板描述需求，Mike 领衔的六人 AI 团队（Emma/Bob/Alex/David/Iris）便会协同完成需求分析、架构设计、编码到沙箱、数据/研究支持等任务：
+
+- **实时流式反馈**：`LLMService` 调用 Deepseek/OpenAI 等模型并将 token/status/error 事件通过 WebSocket 推送到前端，使用户实时看到每个 Agent 的进度。
+- **Docker 沙箱 + 预览**：`app/services/container.py` 管理 per-session 沙箱，文件变更会触发 watcher 推送；未来还将串联预览/圈选编辑，形成“对话 → 代码 → 预览”的闭环。
 
 ## 目录结构
 
@@ -83,5 +88,3 @@ pnpm dev                # Turbo run dev --parallel, 前后端并行
 - **任务调度**：`turbo.json` 维护 dev/build/lint/publish 流程，可在子项目内扩展。
 - **Python 环境**：推荐 `uv` 或 `poetry` 管理虚拟环境，默认配置位于 `apps/backend/pyproject.toml`。
 - **共享资源**：跨项目逻辑优先沉淀到 `packages/`，通过相对依赖引用，保持实现一致。
-
-更多细节请参考 `docs/design` 与 `docs/codex`。
