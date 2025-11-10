@@ -25,13 +25,15 @@ export interface ChatTurn {
 }
 
 export interface StreamEvent {
-  type: 'token' | 'status' | 'error' | 'file_change';
+  type: 'token' | 'status' | 'error' | 'file_change' | 'message';
   sender?: SenderRole;
   agent?: AgentRole | null;
   content?: string;
   message_id?: string;
   final?: boolean;
   session_id?: string;
+  timestamp?: string;
+  sequence?: number;
   paths?: string[];
 }
 

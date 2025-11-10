@@ -78,6 +78,7 @@ export default function Home() {
     }
     setIsSending(true);
     setError(null);
+    let optimisticId: string | null = null;
     try {
       let activeSessionId = sessionId;
       if (!activeSessionId) {
@@ -85,11 +86,36 @@ export default function Home() {
         activeSessionId = session.id;
         setSessionId(session.id);
       }
-      // 发送消息
+      optimisticId = `pending-${Date.now()}`;
+      const optimisticMessage: Message = {
+        id: optimisticId,
+        session_id: activeSessionId,
+        sender: 'user',
+        content,
+        timestamp: new Date().toISOString(),
+        agent: null
+      };
+      mergeMessages(optimisticMessage);
       const turn = await sendMessage(token, activeSessionId, content);
-      mergeMessages([turn.user, ...turn.responses]);
+      setMessages((prev) => {
+        const next = prev.filter((message) => message.id !== optimisticId);
+        const upsert = (item: Message) => {
+          const index = next.findIndex((message) => message.id === item.id);
+          if (index >= 0) {
+            next[index] = item;
+          } else {
+            next.push(item);
+          }
+        };
+        upsert(turn.user);
+        turn.responses.forEach(upsert);
+        return next;
+      });
       await loadSessions();
     } catch (err) {
+      if (optimisticId) {
+        setMessages((prev) => prev.filter((message) => message.id !== optimisticId));
+      }
       setError(err instanceof Error ? err.message : '发送失败，请稍后再试');
     } finally {
       setIsSending(false);
@@ -176,6 +202,10 @@ export default function Home() {
 
         const messageId = data.message_id;
         if (!messageId) return;
+
+        if (data.type === 'message' && data.sender === 'user') {
+          return;
+        }
 
         if (data.type === 'error') {
           const errorContent = data.content || 'LLM 调用失败，请稍后重试';

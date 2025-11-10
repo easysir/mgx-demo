@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 
 from app.dependencies.auth import get_current_user
 from app.models import ChatTurn, Message, MessageCreate, UserProfile
 from app.services import agent_runtime_gateway, session_repository
+from app.services.stream import stream_manager
 from agents.llm import LLMProviderError
 
 router = APIRouter()
@@ -19,6 +21,18 @@ async def send_message(payload: MessageCreate, user: UserProfile = Depends(get_c
         sender='user',
         content=payload.content,
         owner_id=user.id,
+    )
+    await stream_manager.broadcast(
+        payload.session_id,
+        {
+            'type': 'message',
+            'sender': 'user',
+            'agent': None,
+            'content': user_message.content,
+            'message_id': user_message.id,
+            'timestamp': jsonable_encoder(user_message.timestamp),
+            'final': True,
+        },
     )
     try:
         responses = await agent_runtime_gateway.handle_user_turn(
