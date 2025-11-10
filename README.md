@@ -24,6 +24,12 @@ COREPACK_ENABLE_STRICT=0 corepack prepare pnpm@9.12.2 --activate
 pnpm run setup   # 自动安装 Node 依赖 + 创建 ~/venvs/mgx 并安装后端依赖
 ```
 
+### Docker 前置
+- 本地需安装并启动 Docker Desktop 或兼容的 Docker Engine（>= 24.x）。
+- 确保当前用户具备 `docker` 命令权限，执行 `docker ps` 能正常返回结果。
+- 默认沙箱数据会挂载到 `/tmp/mgx/sandboxes/<session_id>`，如需更改可在后端设置 `SANDBOX_BASE_PATH` / `SANDBOX_PROJECT_ROOT` 环境变量。
+- 若需限制沙箱资源，可设置 `SANDBOX_CPU` / `SANDBOX_MEMORY` 等变量后再启动后端。
+
 ### 启动
 - 前端：`pnpm run dev:frontend`（Next.js dev server，默认 http://localhost:3000）
 - 后端：`pnpm run dev:backend`（uvicorn + FastAPI，健康检查 http://127.0.0.1:8000/healthz）
