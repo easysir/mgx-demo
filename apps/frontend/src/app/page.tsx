@@ -173,13 +173,16 @@ export default function Home() {
           return;
         }
 
+        const messageId = data.message_id;
+        if (!messageId) return;
+
         if (data.type === 'error') {
           const errorContent = data.content || 'LLM 调用失败，请稍后重试';
           setError(errorContent);
           setIsSending(false);
           setStreamingMessages({});
           mergeMessages({
-            id: data.message_id,
+            id: messageId,
             session_id: activeSessionId,
             sender: 'status',
             agent: data.agent ?? 'Mike',
@@ -190,8 +193,8 @@ export default function Home() {
         }
 
         setStreamingMessages((prev) => {
-          const baseMessage: Message = prev[data.message_id] ?? {
-            id: data.message_id,
+          const baseMessage: Message = prev[messageId] ?? {
+            id: messageId,
             session_id: activeSessionId,
             sender: data.sender,
             agent: data.agent ?? null,
@@ -205,12 +208,12 @@ export default function Home() {
                   ...baseMessage,
                   sender: 'status',
                   agent: data.agent ?? 'Mike',
-                  content: data.content,
+                  content: data.content ?? '',
                   timestamp: new Date().toISOString()
                 }
               : {
                   ...baseMessage,
-                  content: baseMessage.content + data.content,
+                  content: baseMessage.content + (data.content ?? ''),
                   timestamp: new Date().toISOString()
                 };
 
@@ -219,10 +222,10 @@ export default function Home() {
               ...updated,
               timestamp: new Date().toISOString()
             });
-            const { [data.message_id]: _removed, ...rest } = prev;
+            const { [messageId]: _removed, ...rest } = prev;
             return rest;
           }
-          return { ...prev, [data.message_id]: updated };
+          return { ...prev, [messageId]: updated };
         });
       } catch (err) {
         console.error('Failed to parse stream event', err);
