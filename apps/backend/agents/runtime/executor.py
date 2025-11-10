@@ -12,6 +12,7 @@ from typing import Optional, Callable, Awaitable, Dict, Any
 from shared.types import AgentRole, SenderRole
 
 from ..config import AgentRegistry
+from ..tools import ToolExecutor
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,8 @@ class WorkflowContext:
     session_id: str
     user_id: str
     user_message: str
+    owner_id: str
+    tools: Optional[ToolExecutor] = None
 
 
 StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]

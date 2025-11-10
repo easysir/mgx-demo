@@ -13,6 +13,8 @@ from ..config import AgentRegistry
 from ..llm import LLMProviderError, LLMService
 from ..prompts import SYSTEM_PROMPTS
 from ..runtime.executor import AgentDispatch, AgentWorkflow, StreamPublisher, WorkflowContext
+from ..agents.base import AgentContext
+from ..agents.roles.alex import AlexAgent
 
 AGENT_EXECUTION_ORDER: List[AgentRole] = ['Emma', 'Bob', 'Alex', 'David', 'Iris']
 AGENT_PROVIDERS: Dict[AgentRole, str] = {
@@ -27,6 +29,7 @@ FINISH_TOKENS = {'finish', '完成', '结束', 'done', 'complete'}
 
 MIKE_PLAN_PROMPT = """\
 You are Mike, the MGX team lead. Analyze the user request "{user_message}".
+Alex is the only agent that may perform concrete coding or file changes, so route implementation work to Alex whenever code edits are required.
 Available agents: {available_agents}. For the next step return JSON:
 {{"next_agent": "<Emma|Bob|Alex|David|Iris|finish>", "reason": "<short text>"}}.
 Explain decisions clearly in natural language before/after the JSON block."""
@@ -49,6 +52,7 @@ class SequentialWorkflow(AgentWorkflow):
 
     def __init__(self, llm_service: LLMService) -> None:
         self._llm_service = llm_service
+        self._alex_agent = AlexAgent()
 
     async def generate(
         self,
@@ -208,6 +212,8 @@ class SequentialWorkflow(AgentWorkflow):
         context: WorkflowContext,
         stream_publisher: Optional[StreamPublisher],
     ) -> tuple[str, str]:
+        if agent_name == 'Alex':
+            return await self._run_alex_agent(context, stream_publisher)
         template = SYSTEM_PROMPTS.get(agent_name)
         prompt = template.format(user_message=context.user_message) if template else context.user_message
         provider = AGENT_PROVIDERS.get(agent_name, 'openai')
@@ -220,6 +226,32 @@ class SequentialWorkflow(AgentWorkflow):
             provider=provider,
             stream_publisher=stream_publisher,
             message_id=message_id,
+        )
+        return result, message_id
+
+    async def _run_alex_agent(
+        self, context: WorkflowContext, stream_publisher: Optional[StreamPublisher]
+    ) -> tuple[str, str]:
+        message_id = self._new_message_id()
+        agent_context = AgentContext(
+            session_id=context.session_id,
+            user_id=context.user_id,
+            owner_id=context.owner_id,
+            user_message=context.user_message,
+            tools=context.tools,
+        )
+        result = await self._alex_agent.act(agent_context)
+        await self._publish_event(
+            stream_publisher,
+            context.session_id,
+            {
+                'type': 'token',
+                'sender': 'agent',
+                'agent': 'Alex',
+                'content': result,
+                'message_id': message_id,
+                'final': True,
+            },
         )
         return result, message_id
 

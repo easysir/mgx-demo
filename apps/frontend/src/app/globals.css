@@ -189,8 +189,22 @@ body {
   padding: 0.6rem 0.75rem;
 }
 
+.workspace__history-list li > div {
+  flex: 1;
+  min-width: 0;
+  max-width: calc(100% - 72px);
+  margin-right: 0.75rem;
+}
+
+.workspace__history-list li button {
+  flex-shrink: 0;
+}
+
 .workspace__history-list li strong {
   display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .workspace__history-list li small {

@@ -9,6 +9,7 @@ from .session_repository import (
 from .container import container_manager, ContainerManager, SandboxConfig, SandboxInstance, SandboxError
 from .filesystem import file_service, FileService, FileServiceConfig, FileAccessError
 from .watchers import file_watcher_manager, SandboxFileWatcherManager
+from .capabilities import sandbox_file_capability, SandboxFileCapability
 
 __all__ = [
     "AgentRuntimeGateway",
@@ -30,4 +31,6 @@ __all__ = [
     "FileAccessError",
     "file_watcher_manager",
     "SandboxFileWatcherManager",
+    "sandbox_file_capability",
+    "SandboxFileCapability",
 ]

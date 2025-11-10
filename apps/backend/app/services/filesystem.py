@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Optional
 
-from app.services import ContainerManager, container_manager, SandboxError
+from .container import ContainerManager, container_manager
 
 
 class FileAccessError(RuntimeError):
@@ -116,6 +116,44 @@ class FileService:
             "size": stat.st_size,
             "modified_at": stat.st_mtime,
             "content": content,
+        }
+
+    def write_file(
+        self,
+        *,
+        session_id: str,
+        owner_id: str,
+        path: str,
+        content: str,
+        encoding: str = "utf-8",
+        overwrite: bool = True,
+        append: bool = False,
+    ) -> dict:
+        path = path.strip()
+        if not path or path.endswith("/"):
+            raise FileAccessError("请提供有效的文件路径，不能是目录")
+        target = self._resolve_path(session_id=session_id, owner_id=owner_id, relative_path=path)
+        existed = target.exists()
+        if existed and target.is_dir():
+            raise FileAccessError("目标路径是目录，无法写入文件")
+        if existed and not overwrite and not append:
+            raise FileAccessError("文件已存在，如需覆盖请设置 overwrite=True")
+        encoding = encoding or "utf-8"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        mode = "a" if append else "w"
+        with target.open(mode, encoding=encoding) as handler:
+            handler.write(content)
+        stat = target.stat()
+        project_root = self._resolve_base(session_id=session_id, owner_id=owner_id)
+        rel_path = str(target.relative_to(project_root))
+        if rel_path == ".":
+            rel_path = target.name
+        return {
+            "name": target.name,
+            "path": rel_path,
+            "size": stat.st_size,
+            "modified_at": stat.st_mtime,
+            "created": not existed,
         }
 
 

@@ -5,10 +5,12 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Any, Dict
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional
 
 from shared.types import AgentRole
+
+from ..tools import ToolExecutor
 
 
 @dataclass
@@ -20,8 +22,10 @@ class AgentContext:
 
     session_id: str
     user_id: str
+    owner_id: str
     user_message: str
-    metadata: Dict[str, Any]
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    tools: Optional[ToolExecutor] = None
 
 
 class BaseAgent:
