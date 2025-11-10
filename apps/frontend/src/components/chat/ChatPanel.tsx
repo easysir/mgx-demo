@@ -57,7 +57,7 @@ export function ChatPanel({
       <header className="chat-panel__header">
         <div>
           <p className="eyebrow">会话</p>
-          <h2>{sessionId ?? '未启动'}</h2>
+          <h5>{sessionId ?? '未启动'}</h5>
         </div>
       </header>
 

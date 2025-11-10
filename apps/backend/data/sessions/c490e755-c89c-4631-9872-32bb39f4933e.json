@@ -1,0 +1,24 @@
+{
+  "id": "c490e755-c89c-4631-9872-32bb39f4933e",
+  "title": "Session c490e755",
+  "created_at": "2025-11-10T03:18:10.885177",
+  "owner_id": "user-1",
+  "messages": [
+    {
+      "id": "b254ecaa-c122-4345-8977-ca3d74b7f19f",
+      "session_id": "c490e755-c89c-4631-9872-32bb39f4933e",
+      "sender": "user",
+      "content": "hello",
+      "timestamp": "2025-11-10T03:18:11.096724",
+      "agent": null
+    },
+    {
+      "id": "ae75d084-66f5-4d98-8862-2149419c1bc7",
+      "session_id": "c490e755-c89c-4631-9872-32bb39f4933e",
+      "sender": "status",
+      "content": "LLM 调用失败：OpenAI API error: Error code: 429 - {'error': {'message': 'Rate limit reached for gpt-4o-mini in organization org-I5jzZ5zcErYRUNffPhAZ7pna on tokens per min (TPM): Limit 100000, Used 100000, Requested 77. Please try again in 33m15.84s. Visit https://platform.openai.com/account/rate-limits to learn more. You can increase your rate limit by adding a payment method to your account at https://platform.openai.com/account/billing.', 'type': 'tokens', 'param': None, 'code': 'rate_limit_exceeded'}}",
+      "timestamp": "2025-11-10T03:18:14.435784",
+      "agent": "Mike"
+    }
+  ]
+}

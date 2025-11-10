@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 from app.dependencies.auth import get_current_user
 from app.models import SessionCreate, SessionResponse, UserProfile
-from app.services import container_manager, session_store, SandboxError, file_watcher_manager
+from app.services import container_manager, session_repository, SandboxError, file_watcher_manager
 
 
 class SandboxLaunchRequest(BaseModel):
@@ -46,12 +46,12 @@ async def launch_sandbox(
 
     session = None
     if payload and payload.session_id:
-        session = session_store.get_session(payload.session_id, user.id)
+        session = session_repository.get_session(payload.session_id, user.id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
         logs.append(f"复用会话 {session.id}")
     else:
-        session = session_store.create_session(owner_id=user.id, payload=SessionCreate(title=payload.title if payload else None))
+        session = session_repository.create_session(owner_id=user.id, payload=SessionCreate(title=payload.title if payload else None))
         logs.append(f"创建新会话 {session.id}")
 
     session_response = SessionResponse(**session.model_dump())
@@ -64,7 +64,7 @@ async def launch_sandbox(
     except SandboxError as exc:
         logs.append(f"容器启动失败: {exc}")
         if not payload or not payload.session_id:
-            session_store.delete_session(session.id)
+            session_repository.delete_session(session.id)
         raise HTTPException(status_code=500, detail=str(exc))
 
     return SandboxLaunchResponse(
@@ -81,7 +81,7 @@ async def destroy_sandbox(
     payload: SandboxDestroyRequest,
     user: UserProfile = Depends(get_current_user),
 ) -> SandboxDestroyResponse:
-    session = session_store.get_session(payload.session_id, user.id)
+    session = session_repository.get_session(payload.session_id, user.id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 

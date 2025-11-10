@@ -125,6 +125,7 @@ export default function Home() {
   const handleBackHome = () => {
     setSessionId(undefined);
     setMessages([]);
+    loadSessions();
   };
 
   const recentSessions = useMemo(() => sessions.slice(0, 5), [sessions]);
@@ -325,40 +326,6 @@ export default function Home() {
               {/* {error && <p className="workspace__error">{error}</p>} */}
             </div>
           </section>
-
-          {/* <aside
-            className={`workspace__history-sidebar ${isHistoryOpen ? 'open' : 'collapsed'}`}
-            aria-label="历史会话"
-          >
-            <div className="workspace__history-toggle">
-              <div>
-                <span>历史会话</span>
-                {isLoadingSessions && <small>加载中...</small>}
-              </div>
-              <button type="button" onClick={() => setIsHistoryOpen((prev) => !prev)}>
-                {isHistoryOpen ? '收起' : '展开'}
-              </button>
-            </div>
-            <div className="workspace__history-content">
-              {recentSessions.length === 0 ? (
-                <p className="workspace__history-empty">还没有会话记录</p>
-              ) : (
-                <ul className="workspace__history-list">
-                  {recentSessions.map((session) => (
-                    <li key={session.id}>
-                      <div>
-                        <strong>{session.title}</strong>
-                        <small>{new Date(session.created_at).toLocaleString()}</small>
-                      </div>
-                      <button type="button" onClick={() => handleOpenSession(session.id)} disabled={isSending}>
-                        打开
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </aside> */}
         </div>
       ) : (
         <div className="workspace__chat-layout">

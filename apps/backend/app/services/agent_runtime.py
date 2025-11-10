@@ -8,14 +8,14 @@ from agents import get_agent_orchestrator
 from agents.runtime import WorkflowContext
 from app.models import Message
 
-from .store import SessionStore, session_store
+from .session_repository import SessionRepository, session_repository
 from .stream import stream_manager
 
 
 class AgentRuntimeGateway:
     """Thin wrapper so FastAPI endpoints remain LLM/tool agnostic."""
 
-    def __init__(self, store: SessionStore) -> None:
+    def __init__(self, store: SessionRepository) -> None:
         self._store = store
         self._orchestrator = get_agent_orchestrator()
 
@@ -44,4 +44,4 @@ class AgentRuntimeGateway:
 
 
 # TODO: 当 agents 迁移为独立微服务时，这里改为 RPC/消息队列调用。
-agent_runtime_gateway = AgentRuntimeGateway(session_store)
+agent_runtime_gateway = AgentRuntimeGateway(session_repository)

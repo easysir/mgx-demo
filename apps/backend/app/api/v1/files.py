@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.dependencies.auth import get_current_user
 from app.models import UserProfile
-from app.services import file_service, FileAccessError, session_store
+from app.services import file_service, FileAccessError, session_repository
 
 
 class FileNode(BaseModel):
@@ -36,7 +36,7 @@ router = APIRouter()
 
 
 def _ensure_session(session_id: str, user: UserProfile):
-    session = session_store.get_session(session_id, user.id)
+    session = session_repository.get_session(session_id, user.id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 

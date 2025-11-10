@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.dependencies.auth import get_current_user
 from app.models import ChatTurn, Message, MessageCreate, UserProfile
-from app.services import agent_runtime_gateway, session_store
+from app.services import agent_runtime_gateway, session_repository
 from agents.llm import LLMProviderError
 
 router = APIRouter()
@@ -10,11 +10,11 @@ router = APIRouter()
 
 @router.post("/messages", response_model=ChatTurn, status_code=201)
 async def send_message(payload: MessageCreate, user: UserProfile = Depends(get_current_user)) -> ChatTurn:
-    session = session_store.get_session(payload.session_id, user.id)
+    session = session_repository.get_session(payload.session_id, user.id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    user_message = session_store.append_message(
+    user_message = session_repository.append_message(
         session_id=payload.session_id,
         sender='user',
         content=payload.content,
@@ -29,12 +29,20 @@ async def send_message(payload: MessageCreate, user: UserProfile = Depends(get_c
         )
         return ChatTurn(user=user_message, responses=responses)
     except LLMProviderError as exc:
+        # Persist an error/status message so历史可追踪
+        session_repository.append_message(
+            session_id=payload.session_id,
+            sender='status',
+            content=f"LLM 调用失败：{exc}",
+            owner_id=session.owner_id,
+            agent='Mike'
+        )
         raise HTTPException(status_code=429, detail=str(exc)) from exc
 
 
 @router.get("/messages/{session_id}", response_model=list[Message])
 async def fetch_messages(session_id: str, user: UserProfile = Depends(get_current_user)) -> list[Message]:
-    session = session_store.get_session(session_id, user.id)
+    session = session_repository.get_session(session_id, user.id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session.messages

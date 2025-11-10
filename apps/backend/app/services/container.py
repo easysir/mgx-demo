@@ -46,9 +46,21 @@ class ContainerManager:
             return self._instances[session_id]
 
         workspace_path = self.config.base_path / session_id
-        workspace_path.mkdir(parents=True, exist_ok=True)
-
         container_name = f"mgx-session-{session_id}"
+
+        existing_id = self._find_existing_container(container_name)
+        if existing_id:
+            instance = SandboxInstance(
+                session_id=session_id,
+                owner_id=owner_id,
+                container_name=container_name,
+                container_id=existing_id,
+                workspace_path=workspace_path,
+            )
+            self._instances[session_id] = instance
+            return instance
+
+        workspace_path.mkdir(parents=True, exist_ok=True)
         container_id = self._start_container(container_name=container_name, workspace_path=workspace_path)
 
         instance = SandboxInstance(
@@ -108,6 +120,29 @@ class ContainerManager:
         if result.returncode != 0:
             raise SandboxError(f"Failed to start sandbox: {result.stderr.strip() or result.stdout.strip()}")
         return result.stdout.strip()
+
+    def _find_existing_container(self, container_name: str) -> Optional[str]:
+        result = subprocess.run([
+            "docker",
+            "ps",
+            "-a",
+            "--filter",
+            f"name={container_name}",
+            "--format",
+            "{{.ID}} {{.Status}}"
+        ], capture_output=True, text=True)
+        if result.returncode != 0:
+            return None
+        lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+        if not lines:
+            return None
+        first = lines[0].split()[0]
+        texture = ' '.join(lines[0].split()[1:])
+        if texture.startswith('Up'):
+            return first
+        subprocess.run(["docker", "start", container_name], capture_output=True, text=True)
+        inspect = subprocess.run(["docker", "ps", "-q", "--filter", f"name={container_name}"], capture_output=True, text=True)
+        return inspect.stdout.strip() or first
 
     def _stop_container(self, container_name: str) -> None:
         """Stop docker container gracefully."""
