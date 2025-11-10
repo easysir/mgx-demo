@@ -1,0 +1,24 @@
+{
+  "id": "df69c7b2-ac80-468e-a7b6-e01035f00ba2",
+  "title": "hi",
+  "created_at": "2025-11-10T09:58:57.763015",
+  "owner_id": "user-1",
+  "messages": [
+    {
+      "id": "5c274dcc-f269-4edc-a05e-967f742ec7a3",
+      "session_id": "df69c7b2-ac80-468e-a7b6-e01035f00ba2",
+      "sender": "user",
+      "content": "hi",
+      "timestamp": "2025-11-10T09:58:58.779557",
+      "agent": null
+    },
+    {
+      "id": "8d1d727d-ddeb-433a-9eb8-65872ac2cba9",
+      "session_id": "df69c7b2-ac80-468e-a7b6-e01035f00ba2",
+      "sender": "status",
+      "content": "LLM 调用失败：[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1028)",
+      "timestamp": "2025-11-10T09:58:58.945185",
+      "agent": "Mike"
+    }
+  ]
+}

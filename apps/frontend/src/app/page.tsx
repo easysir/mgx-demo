@@ -85,6 +85,7 @@ export default function Home() {
         activeSessionId = session.id;
         setSessionId(session.id);
       }
+      // 发送消息
       const turn = await sendMessage(token, activeSessionId, content);
       mergeMessages([turn.user, ...turn.responses]);
       await loadSessions();

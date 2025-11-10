@@ -20,12 +20,12 @@ class AgentContext:
     运行时上下文会携带会话、用户和当前输入等信息，方便 Agent 在不共享状态的情况下读取所需数据。
     """
 
-    session_id: str
-    user_id: str
-    owner_id: str
-    user_message: str
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    tools: Optional[ToolExecutor] = None
+    session_id: str  # 当前对话/沙箱的唯一标识，驱动上下文隔离
+    user_id: str  # 发起本轮指令的用户 ID，可用于个性化提示
+    owner_id: str  # 会话实际归属者（方便共享/代办场景）
+    user_message: str  # 用户本轮输入，用于生成回复或指令
+    metadata: Dict[str, Any] = field(default_factory=dict)  # 额外上下文（历史摘要、配置等）
+    tools: Optional[ToolExecutor] = None  # 可选工具执行器，支持文件写入等动作
 
 
 class BaseAgent:
