@@ -27,7 +27,7 @@ class EmmaAgent(BaseAgent):
     ) -> AgentRunResult:
         research_snippets = await self._collect_research(context)
         prompt = EMMA_SYSTEM_PROMPT.format(
-            user_message=context.user_message,
+            user_message=self._compose_user_message(context),
             research_snippets=research_snippets,
         )
         message_id = self._new_message_id()

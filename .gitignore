@@ -18,5 +18,7 @@ venv/
 # Env / build artifacts
 dist/
 build/
+.cache/
+apps/backend/data/sessions/
 .env
 .env.*

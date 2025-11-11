@@ -16,7 +16,7 @@ class DavidAgent(BaseAgent):
     async def act(
         self, context: AgentContext, stream_publisher: StreamPublisher | None = None
     ) -> AgentRunResult:
-        prompt = DAVID_SYSTEM_PROMPT.format(user_message=context.user_message)
+        prompt = DAVID_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         return await self._stream_llm_response(
             context=context,
             prompt=prompt,

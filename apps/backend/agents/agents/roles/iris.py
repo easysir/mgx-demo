@@ -19,7 +19,7 @@ class IrisAgent(BaseAgent):
     ) -> AgentRunResult:
         research_snippets = await self._collect_external_insights(context)
         prompt = IRIS_SYSTEM_PROMPT.format(
-            user_message=context.user_message,
+            user_message=self._compose_user_message(context),
             research_snippets=research_snippets,
         )
         return await self._stream_llm_response(

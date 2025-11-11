@@ -26,7 +26,7 @@ class AlexAgent(BaseAgent):
     async def act(
         self, context: AgentContext, stream_publisher: StreamPublisher | None = None
     ) -> AgentRunResult:
-        prompt = ALEX_SYSTEM_PROMPT.format(user_message=context.user_message)
+        prompt = ALEX_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         message_id = self._new_message_id()
         chunks: list[str] = []
         try:

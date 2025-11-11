@@ -20,7 +20,7 @@ class MikeAgent(BaseAgent):
     async def act(
         self, context: AgentContext, stream_publisher: StreamPublisher | None = None
     ) -> AgentRunResult:
-        prompt = MIKE_SYSTEM_PROMPT.format(user_message=context.user_message)
+        prompt = MIKE_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         return await self._stream_llm_response(
             context=context,
             prompt=prompt,
@@ -40,7 +40,7 @@ class MikeAgent(BaseAgent):
         else:
             available_text = '暂无可用 Agent'
         prompt = MIKE_PLAN_PROMPT.format(
-            user_message=context.user_message,
+            user_message=self._compose_user_message(context),
             available_agents=available_text,
         )
         return await self._stream_llm_response(
@@ -80,7 +80,7 @@ class MikeAgent(BaseAgent):
     ) -> AgentRunResult:
         contributions_text = self._render_contributions(contributions)
         prompt = MIKE_SUMMARY_PROMPT.format(
-            user_message=context.user_message,
+            user_message=self._compose_user_message(context),
             contributions=contributions_text,
         )
         return await self._stream_llm_response(

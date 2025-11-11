@@ -143,8 +143,14 @@ class BaseAgent:
                     'message_id': message_id,
                     'final': True,
                 }
-            )
+        )
         return AgentRunResult(agent=self.name, sender=sender, content=content, message_id=message_id)
 
     def _new_message_id(self) -> str:
         return str(uuid4())
+
+    def _compose_user_message(self, context: AgentContext) -> str:
+        history = context.metadata.get('history') if context.metadata else None
+        if history:
+            return f"最近对话（供参考）:\n{history}\n\n当前用户输入:\n{context.user_message}"
+        return context.user_message

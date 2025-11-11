@@ -30,6 +30,7 @@ class WorkflowContext:
     user_message: str
     owner_id: str
     tools: Optional[ToolExecutor] = None
+    history: Optional[str] = None
 
 
 StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]

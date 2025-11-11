@@ -38,12 +38,14 @@ class AgentRuntimeGateway:
     ) -> List[Message]:
         """Forward a user turn to the orchestrator and persist agent replies."""
         # 构造编排上下文：包含用户输入、会话身份以及可用工具
+        history_text = self._collect_history(session_id=session_id, owner_id=owner_id)
         context = WorkflowContext(
             session_id=session_id,
             user_id=user_id,
             owner_id=owner_id,
             user_message=user_message,
             tools=self._tool_executor,
+            history=history_text,
         )
         # 为该 session 生成 WebSocket 推送器，编排器在生成 token/status 时复用
         stream_publisher = self._build_stream_publisher(session_id)
@@ -84,6 +86,20 @@ class AgentRuntimeGateway:
             await stream_manager.broadcast(session_id, event)
 
         return publish
+
+    def _collect_history(self, *, session_id: str, owner_id: str, limit: int = 8) -> str:
+        try:
+            messages = self._store.list_messages(session_id, owner_id)
+        except KeyError:
+            return ''
+        if not messages:
+            return ''
+        recent = messages[-limit:]
+        lines = []
+        for message in recent:
+            sender = message.agent or message.sender
+            lines.append(f"{sender}: {message.content}")
+        return '\n'.join(lines)
 
     async def _handle_tool_call_event(self, tool_name: str, params: Dict[str, Any]) -> None:
         session_id = params.get('session_id')

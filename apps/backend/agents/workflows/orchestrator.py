@@ -104,11 +104,15 @@ class SequentialWorkflow(AgentWorkflow):
         return dispatches
 
     def _build_agent_context(self, context: WorkflowContext) -> AgentContext:
+        metadata: Dict[str, Any] = {}
+        if context.history:
+            metadata['history'] = context.history
         return AgentContext(
             session_id=context.session_id,
             user_id=context.user_id,
             owner_id=context.owner_id,
             user_message=context.user_message,
+            metadata=metadata,
             tools=context.tools,
         )
 
