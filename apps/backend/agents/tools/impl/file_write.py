@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from .adapters import SandboxFileAdapter
-from .executor import Tool, ToolExecutionError
+from ..adapters import SandboxFileAdapter
+from ..executor import Tool, ToolExecutionError
 
 
 class FileWriteTool(Tool):

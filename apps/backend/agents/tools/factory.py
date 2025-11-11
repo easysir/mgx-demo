@@ -4,7 +4,8 @@ from dataclasses import dataclass
 
 from .adapters import SandboxFileAdapter
 from .executor import ToolExecutor
-from .file_write import FileWriteTool
+from .impl.file_write import FileWriteTool
+from .impl.web_search import WebSearchTool
 
 
 @dataclass(frozen=True)
@@ -15,6 +16,7 @@ class ToolAdapters:
 def build_tool_executor(adapters: ToolAdapters) -> ToolExecutor:
     executor = ToolExecutor()
     executor.register(FileWriteTool(adapters.sandbox_file))
+    executor.register(WebSearchTool())
     return executor
 
 
