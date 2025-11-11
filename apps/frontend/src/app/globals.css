@@ -29,6 +29,13 @@ body {
   background: #eef2ff;
 }
 
+.login-back {
+  position: absolute;
+  left: 1.5rem;
+  top: 1.5rem;
+  color: #777;
+}
+
 .login-card {
   background: #ffffff;
   padding: 2rem;
@@ -478,6 +485,7 @@ body {
   background: rgba(99, 102, 241, 0.15);
   border-radius: 12px;
   padding: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .chat-panel__message--mike,
@@ -485,6 +493,8 @@ body {
   background: rgba(14, 165, 233, 0.12);
   border-radius: 12px;
   padding: 0.75rem;
+  font-size: 0.85rem;
+  color: #555;
 }
 
 .chat-panel__message--status {
@@ -492,6 +502,7 @@ body {
   border-radius: 12px;
   padding: 0.6rem 0.75rem;
   font-size: 0.85rem;
+  color: #555;
 }
 
 .chat-panel__input {

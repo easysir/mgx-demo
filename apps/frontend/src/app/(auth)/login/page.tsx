@@ -23,11 +23,11 @@ export default function LoginPage() {
 
   return (
     <main className="login-page">
+      <div className="login-back" onClick={() => router.push('/')}>
+        返回首页
+      </div>
       <section className="login-card">
-        <button className="ghost login-back" type="button" onClick={() => router.push('/')}>
-          ← 返回首页
-        </button>
-        <h1>登录 MGX</h1>
+        <h3>登录 MGX</h3>
         <form onSubmit={handleSubmit}>
           <label>
             邮箱

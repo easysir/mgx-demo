@@ -23,7 +23,6 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [streamingMessages, setStreamingMessages] = useState<Record<string, Message>>({});
   const [activeRightTab, setActiveRightTab] = useState<'editor' | 'preview'>('editor');
-  const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const [fileVersion, setFileVersion] = useState(0);
 
   const hasActiveSession = Boolean(sessionId);
@@ -287,14 +286,14 @@ export default function Home() {
           {user ? (
             <div className="workspace__user">
               <div>
-                <strong>{user.name}</strong>
+                <span className="">{user.name}</span>
                 <small>
                   {user.plan} · {user.credits} credits
                 </small>
               </div>
-              <button type="button" className="ghost" onClick={logout}>
+              <div className="ghost" onClick={logout}>
                 登出
-              </button>
+              </div>
             </div>
           ) : (
             <Link className="ghost" href="/login">
@@ -306,40 +305,35 @@ export default function Home() {
 
       {isHomeView ? (
         <div className="workspace__home-layout">
-                    <aside
-            className={`workspace__history-sidebar ${isHistoryOpen ? 'open' : 'collapsed'}`}
-            aria-label="历史会话"
-          >
-            <div className="workspace__history-toggle">
-              <div>
-                <span>历史会话</span>
-                {isLoadingSessions && <small>加载中...</small>}
+          {user && (
+            <aside className="workspace__history-sidebar" aria-label="历史会话">
+              <div className="workspace__history-toggle">
+                <div>
+                  <span>历史会话</span>
+                  {isLoadingSessions && <small>加载中...</small>}
+                </div>
               </div>
-              <button type="button" onClick={() => setIsHistoryOpen((prev) => !prev)}>
-                {isHistoryOpen ? '收起' : '展开'}
-              </button>
-            </div>
-            <div className="workspace__history-content">
-              {recentSessions.length === 0 ? (
-                <p className="workspace__history-empty">还没有会话记录</p>
-              ) : (
-                <ul className="workspace__history-list">
-                  {recentSessions.map((session) => (
-                    <li key={session.id}>
-                      <div>
-                        <strong>{session.title}</strong>
-                        <small>{new Date(session.created_at).toLocaleString()}</small>
-                      </div>
-                      <button type="button" onClick={() => handleOpenSession(session.id)} disabled={isSending}>
-                        打开
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </aside>
-          
+              <div className="workspace__history-content">
+                {recentSessions.length === 0 ? (
+                  <p className="workspace__history-empty">还没有会话记录</p>
+                ) : (
+                  <ul className="workspace__history-list">
+                    {recentSessions.map((session) => (
+                      <li key={session.id}>
+                        <div>
+                          <strong>{session.title}</strong>
+                          <small>{new Date(session.created_at).toLocaleString()}</small>
+                        </div>
+                        <button type="button" onClick={() => handleOpenSession(session.id)} disabled={isSending}>
+                          打开
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </aside>
+          )}
           <section className="workspace__home">
             <div className="workspace__home-card">
               {/* <h4>告诉 MGX 你想做什么</h4> */}

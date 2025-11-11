@@ -1,0 +1,24 @@
+{
+  "id": "84f7e939-842a-4072-bb50-0383c013d7d0",
+  "title": "帮我生成一个百度首页的前端页面",
+  "created_at": "2025-11-10T15:17:59.264444",
+  "owner_id": "user-1",
+  "messages": [
+    {
+      "id": "c601261c-8a4a-4dd4-8657-0d47ea817af1",
+      "session_id": "84f7e939-842a-4072-bb50-0383c013d7d0",
+      "sender": "user",
+      "content": "帮我生成一个百度首页的前端页面",
+      "timestamp": "2025-11-10T15:18:01.219123",
+      "agent": null
+    },
+    {
+      "id": "c30616cb-11c2-4780-b281-7c8ff256dcf3",
+      "session_id": "84f7e939-842a-4072-bb50-0383c013d7d0",
+      "sender": "status",
+      "content": "LLM 调用失败：",
+      "timestamp": "2025-11-10T15:18:38.140304",
+      "agent": "Mike"
+    }
+  ]
+}
