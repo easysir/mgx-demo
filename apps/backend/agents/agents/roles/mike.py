@@ -35,9 +35,13 @@ class MikeAgent(BaseAgent):
         available_agents: list[str],
         stream_publisher: StreamPublisher | None = None,
     ) -> AgentRunResult:
+        if available_agents:
+            available_text = '\n'.join(f"- {entry}" for entry in available_agents)
+        else:
+            available_text = '暂无可用 Agent'
         prompt = MIKE_PLAN_PROMPT.format(
             user_message=context.user_message,
-            available_agents=', '.join(available_agents) if available_agents else '暂无可用 Agent',
+            available_agents=available_text,
         )
         return await self._stream_llm_response(
             context=context,

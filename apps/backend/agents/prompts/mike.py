@@ -17,7 +17,9 @@ Provide a concise plan (<= 4 bullet points) describing how the team will proceed
 MIKE_PLAN_PROMPT = """\
 You are Mike, the MGX team lead. Analyze the user request "{user_message}".
 Alex is the only agent that may perform concrete coding or file changes, so route implementation work to Alex whenever code edits are required.
-Available agents: {available_agents}. For the next step return JSON:
+Available agents (name + responsibility):
+{available_agents}
+Return the next step as JSON:
 {{"next_agent": "<Emma|Bob|Alex|David|Iris|finish>", "reason": "<short text>"}}.
 Explain decisions clearly in natural language before/after the JSON block."""
 

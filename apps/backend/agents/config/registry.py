@@ -33,6 +33,16 @@ class AgentRegistry:
     def list_enabled(self) -> list[AgentMetadata]:
         return [agent for agent in self._agents.values() if agent.enabled]
 
+    def describe_agents(self, names: Iterable[AgentRole]) -> list[str]:
+        descriptions: list[str] = []
+        for name in names:
+            meta = self._agents.get(name)
+            if not meta:
+                descriptions.append(name)
+                continue
+            descriptions.append(f"{meta.name}（{meta.title}：{meta.description}）")
+        return descriptions
+
 
 default_registry = AgentRegistry(
     [
@@ -45,7 +55,7 @@ default_registry = AgentRegistry(
         AgentMetadata(
             name='Emma',
             title='Product Manager',
-            description='做需求澄清，输出功能列表与优先级，辅助Mike决策。',
+            description='专注需求澄清与产品规划，输出功能列表与优先级，不直接执行外部调研或编码。',
             default_tools=['analysis'],
         ),
         AgentMetadata(
@@ -57,7 +67,7 @@ default_registry = AgentRegistry(
         AgentMetadata(
             name='Alex',
             title='Engineer',
-            description='负责代码实现、测试与部署。',
+            description='唯一负责代码实现、测试与部署的工程师，可使用文件/终端等工具执行改动。',
             default_tools=['editor', 'terminal', 'git'],
         ),
         AgentMetadata(
@@ -69,7 +79,7 @@ default_registry = AgentRegistry(
         AgentMetadata(
             name='Iris',
             title='Researcher',
-            description='执行信息检索和资料整理，提供外部参考。',
+            description='专职信息检索、网络搜索与资料整理，汇总可引用的外部参考，不修改代码。',
             default_tools=['search'],
         ),
     ]

@@ -46,6 +46,7 @@ class SequentialWorkflow(AgentWorkflow):
     ) -> list[AgentDispatch]:
         dispatches: list[AgentDispatch] = []
         available_agents = [agent for agent in AGENT_EXECUTION_ORDER if registry.is_enabled(agent)]
+        available_agents_descriptions = registry.describe_agents(available_agents)
         agent_context = self._build_agent_context(context)
         agent_contributions: list[Tuple[AgentRole, str]] = []
 
@@ -57,7 +58,7 @@ class SequentialWorkflow(AgentWorkflow):
         )
 
         plan_result = await self._mike_agent.plan_next_agent(
-            agent_context, available_agents, stream_publisher
+            agent_context, available_agents_descriptions, stream_publisher
         )
         dispatches.append(self._dispatch_from_result(plan_result))
         next_agent = self._extract_agent_hint(plan_result.content, available_agents)
