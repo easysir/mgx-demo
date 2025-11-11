@@ -2,16 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Any, Awaitable, Callable, Dict, List
+import json
+import logging
+from datetime import timezone
+from typing import Any, Awaitable, Callable, Dict, List, get_args
 
 from agents import get_agent_orchestrator
 from agents.runtime import WorkflowContext
 from agents.tools import ToolExecutor, ToolAdapters, build_tool_executor
 from app.models import Message
+from shared.types import AgentRole
 
 from .session_repository import SessionRepository, session_repository
 from .stream import stream_manager
 from .capabilities import sandbox_file_capability
+
+logger = logging.getLogger(__name__)
+AGENT_NAME_SET = set(get_args(AgentRole))
 
 
 class AgentRuntimeGateway:
@@ -24,6 +31,7 @@ class AgentRuntimeGateway:
         self._tool_executor = tools or build_tool_executor(
             ToolAdapters(sandbox_file=sandbox_file_capability)
         )
+        self._tool_executor.set_event_hook(self._handle_tool_call_event)
 
     async def handle_user_turn(
         self, *, session_id: str, owner_id: str, user_id: str, user_message: str
@@ -64,7 +72,10 @@ class AgentRuntimeGateway:
     ) -> Dict[str, Any]:
         """Execute a registered tool on behalf of an agent or API consumer."""
         # 标准化工具调用入参，附带 session/owner 以做沙箱隔离
-        payload = {'session_id': session_id, 'owner_id': owner_id, **(extra_params or {})}
+        payload: Dict[str, Any] = {'session_id': session_id, 'owner_id': owner_id}
+        if extra_params:
+            payload.update(extra_params)
+        payload.setdefault('agent', (extra_params or {}).get('agent', 'external'))
         return await self._tool_executor.run(tool_name, params=payload)
 
     def _build_stream_publisher(self, session_id: str) -> Callable[[Dict[str, Any]], Awaitable[None]]:
@@ -73,6 +84,40 @@ class AgentRuntimeGateway:
             await stream_manager.broadcast(session_id, event)
 
         return publish
+
+    async def _handle_tool_call_event(self, tool_name: str, params: Dict[str, Any]) -> None:
+        session_id = params.get('session_id')
+        owner_id = params.get('owner_id')
+        if not session_id or not owner_id:
+            logger.debug('忽略缺少 session/owner 的工具调用记录: %s', tool_name)
+            return
+        raw_agent = params.get('agent')
+        agent_name = raw_agent if isinstance(raw_agent, str) and raw_agent in AGENT_NAME_SET else None
+        invoker = raw_agent or agent_name or 'tool'
+        content = f"[工具调用] {tool_name}"
+        message = self._store.append_message(
+            session_id=session_id,
+            sender='agent',
+            agent=agent_name,
+            content=content,
+            owner_id=owner_id,
+        )
+        event_payload = {
+            'type': 'tool_call',
+            'sender': 'agent',
+            'agent': agent_name,
+            'invoker': invoker,
+            'tool': tool_name,
+            'content': content,
+            'message_id': message.id,
+            'final': True,
+            'timestamp': message.timestamp.replace(tzinfo=timezone.utc).isoformat(),
+        }
+        try:
+            await stream_manager.broadcast(session_id, event_payload)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning('Failed to broadcast tool event for %s: %s', session_id, exc)
+
 
 
 # TODO: 当 agents 迁移为独立微服务时，这里改为 RPC/消息队列调用。

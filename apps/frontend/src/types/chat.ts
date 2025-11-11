@@ -25,7 +25,7 @@ export interface ChatTurn {
 }
 
 export interface StreamEvent {
-  type: 'token' | 'status' | 'error' | 'file_change' | 'message';
+  type: 'token' | 'status' | 'error' | 'file_change' | 'message' | 'tool_call';
   sender?: SenderRole;
   agent?: AgentRole | null;
   content?: string;
@@ -35,6 +35,8 @@ export interface StreamEvent {
   timestamp?: string;
   sequence?: number;
   paths?: string[];
+  tool?: string;
+  invoker?: string;
 }
 
 export interface TokenResponse {

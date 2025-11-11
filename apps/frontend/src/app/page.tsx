@@ -202,6 +202,20 @@ export default function Home() {
         const messageId = data.message_id;
         if (!messageId) return;
 
+        if (data.type === 'tool_call') {
+          const eventTimestamp = data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString();
+          const content = data.content ?? `[工具调用] ${data.tool ?? ''}`;
+          mergeMessages({
+            id: messageId,
+            session_id: activeSessionId,
+            sender: data.sender ?? 'agent',
+            agent: data.agent ?? null,
+            content,
+            timestamp: eventTimestamp
+          });
+          return;
+        }
+
         if (data.type === 'message' && data.sender === 'user') {
           return;
         }
@@ -229,7 +243,7 @@ export default function Home() {
             sender: data.sender,
             agent: data.agent ?? null,
             content: '',
-            timestamp: new Date().toISOString()
+            timestamp: prev[messageId]?.timestamp ?? data.timestamp ?? new Date().toISOString()
           };
 
           const updated: Message =
@@ -238,20 +252,18 @@ export default function Home() {
                   ...baseMessage,
                   sender: 'status',
                   agent: data.agent ?? 'Mike',
-                  content: data.content ?? '',
-                  timestamp: new Date().toISOString()
+                  content: data.content ?? ''
                 }
               : {
                   ...baseMessage,
-                  content: baseMessage.content + (data.content ?? ''),
-                  timestamp: new Date().toISOString()
+                  content: baseMessage.content + (data.content ?? '')
                 };
 
           if (data.final) {
-            mergeMessages({
-              ...updated,
-              timestamp: new Date().toISOString()
-            });
+                  mergeMessages({
+                    ...updated,
+                    timestamp: baseMessage.timestamp
+                  });
             const { [messageId]: _removed, ...rest } = prev;
             return rest;
           }
