@@ -31,6 +31,7 @@ class WorkflowContext:
     owner_id: str
     tools: Optional[ToolExecutor] = None
     history: Optional[str] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 
 StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]

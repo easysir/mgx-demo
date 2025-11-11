@@ -11,6 +11,7 @@ from agents import get_agent_orchestrator
 from agents.runtime import WorkflowContext
 from agents.tools import ToolExecutor, ToolAdapters, build_tool_executor
 from app.models import Message
+from .filesystem import file_service, FileAccessError
 from shared.types import AgentRole
 
 from .session_repository import SessionRepository, session_repository
@@ -39,6 +40,7 @@ class AgentRuntimeGateway:
         """Forward a user turn to the orchestrator and persist agent replies."""
         # 构造编排上下文：包含用户输入、会话身份以及可用工具
         history_text = self._collect_history(session_id=session_id, owner_id=owner_id)
+        file_context = self._collect_file_context(session_id=session_id, owner_id=owner_id)
         context = WorkflowContext(
             session_id=session_id,
             user_id=user_id,
@@ -46,6 +48,7 @@ class AgentRuntimeGateway:
             user_message=user_message,
             tools=self._tool_executor,
             history=history_text,
+            metadata={'files': file_context} if file_context else None,
         )
         # 为该 session 生成 WebSocket 推送器，编排器在生成 token/status 时复用
         stream_publisher = self._build_stream_publisher(session_id)
@@ -100,6 +103,37 @@ class AgentRuntimeGateway:
             sender = message.agent or message.sender
             lines.append(f"{sender}: {message.content}")
         return '\n'.join(lines)
+
+    def _collect_file_context(self, *, session_id: str, owner_id: str, limit: int = 6) -> str:
+        try:
+            entries = file_service.list_tree(
+                session_id=session_id,
+                owner_id=owner_id,
+                root='',
+                depth=2,
+                include_hidden=False,
+            )
+        except FileAccessError:
+            return ''
+        except Exception:
+            return ''
+        files: list[str] = []
+
+        def visit(nodes: list[dict]) -> None:
+            for node in nodes:
+                if len(files) >= limit:
+                    return
+                path = node.get('path') or node.get('name', '')
+                if node.get('type') == 'file':
+                    files.append(f"{path} (size {node.get('size', 0)})")
+                children = node.get('children')
+                if children:
+                    visit(children)
+
+        visit(entries)
+        if not files:
+            return ''
+        return '\n'.join(f"- {item}" for item in files)
 
     async def _handle_tool_call_event(self, tool_name: str, params: Dict[str, Any]) -> None:
         session_id = params.get('session_id')

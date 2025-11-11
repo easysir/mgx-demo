@@ -44,9 +44,11 @@ class BobAgent(BaseAgent):
                     )
             raw = ''.join(chunks)
             reference_blocks = self._extract_read_blocks(raw)
+            history_paths = self._discover_shared_paths(context)
+            combined_refs = list(dict.fromkeys(reference_blocks + history_paths))
             references = ''
-            if reference_blocks and context.tools:
-                references = await self._inject_references(reference_blocks, context=context)
+            if combined_refs and context.tools:
+                references = await self._inject_references(combined_refs, context=context)
             summary = f"{references}\n\n{raw}".strip() if references else raw
             files = self._extract_file_blocks(raw)
             applied: list[str] = []
@@ -121,6 +123,23 @@ class BobAgent(BaseAgent):
 
     def _extract_read_blocks(self, text: str) -> List[str]:
         return [match.group('path').strip() for match in re.finditer(r"\{\{read_file:(?P<path>[^\}]+)\}\}", text) if match.group('path').strip()]
+
+    def _discover_shared_paths(self, context: AgentContext) -> List[str]:
+        history = context.metadata.get('history') if context.metadata else ''
+        if not history:
+            return []
+        paths: List[str] = []
+        for line in history.splitlines():
+            stripped = line.strip()
+            if not stripped.startswith('-'):
+                continue
+            candidate = stripped.lstrip('-').strip()
+            if not candidate:
+                continue
+            candidate = candidate.split(' (')[0].strip()
+            if '/' in candidate or candidate.endswith('.md') or candidate.endswith('.txt'):
+                paths.append(candidate)
+        return paths
 
     async def _inject_references(self, paths: List[str], *, context: AgentContext) -> str:
         snippets: List[str] = []

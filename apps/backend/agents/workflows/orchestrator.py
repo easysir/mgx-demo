@@ -107,6 +107,8 @@ class SequentialWorkflow(AgentWorkflow):
         metadata: Dict[str, Any] = {}
         if context.history:
             metadata['history'] = context.history
+        if context.metadata:
+            metadata.update(context.metadata)
         return AgentContext(
             session_id=context.session_id,
             user_id=context.user_id,
