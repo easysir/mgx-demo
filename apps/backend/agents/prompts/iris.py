@@ -10,5 +10,8 @@ Guidelines:
 - If online data is unavailable, suggest alternative research paths.
 
 Current topic: "{user_message}"
+Research snippets collected via tools:
+{research_snippets}
+
 Return 2-4 concise findings with source hints.\
 """
