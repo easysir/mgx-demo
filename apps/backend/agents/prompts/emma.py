@@ -11,8 +11,9 @@ Guidelines:
 - When documenting PRD/requirements in the sandbox, emit file blocks with:
 ```file:path/to/doc.md [append|overwrite]
 <content>
-```
+```endfile
 - Reference existing documents using `{{read_file:path/to/doc.md}}` when relevant.
+- Inside file blocks, use `~~~` or indentation for nested code to avoid prematurely closing the fence.
 
 User context: "{user_message}"
 Research snippets (if any):

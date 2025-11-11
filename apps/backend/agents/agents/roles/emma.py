@@ -7,10 +7,7 @@ from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
 from ...prompts import EMMA_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 from ...llm import LLMProviderError
-
-FILE_BLOCK_PATTERN = re.compile(
-    r"```file:(?P<header>[^\n]+)\n(?P<body>.*?)```", re.DOTALL | re.IGNORECASE
-)
+from ...utils import extract_file_blocks
 
 
 class EmmaAgent(BaseAgent):
@@ -52,7 +49,7 @@ class EmmaAgent(BaseAgent):
             if reference_blocks and context.tools:
                 references = await self._inject_references(reference_blocks, context=context)
             summary = f"{references}\n\n{raw}".strip() if references else raw
-            files = self._extract_file_blocks(raw)
+            files = extract_file_blocks(raw)
             applied: list[str] = []
             if files and context.tools:
                 for spec in files:
@@ -126,29 +123,6 @@ class EmmaAgent(BaseAgent):
             url = item.get('url') or ''
             lines.append(f"- {title}: {snippet} (Source: {url})".strip())
         return '\n'.join(lines) if lines else '（未检索到可引用的外部资料）'
-
-    def _extract_file_blocks(self, text: str) -> List[Dict[str, Any]]:
-        specs: List[Dict[str, Any]] = []
-        for match in FILE_BLOCK_PATTERN.finditer(text):
-            header = match.group('header').strip()
-            body = match.group('body')
-            if not body:
-                continue
-            segments = header.split()
-            path = segments[0]
-            mode = 'overwrite'
-            for token in segments[1:]:
-                lowered = token.lower()
-                if lowered in {'append', 'overwrite'}:
-                    mode = lowered
-            specs.append(
-                {
-                    'path': path,
-                    'mode': mode,
-                    'content': body.strip(),
-                }
-            )
-        return specs
 
     def _extract_read_blocks(self, text: str) -> List[str]:
         return [

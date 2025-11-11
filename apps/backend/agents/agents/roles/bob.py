@@ -7,10 +7,7 @@ from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
 from ...prompts import BOB_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 from ...llm import LLMProviderError
-
-FILE_BLOCK_PATTERN = re.compile(
-    r"```file:(?P<header>[^\n]+)\n(?P<body>.*?)```", re.DOTALL | re.IGNORECASE
-)
+from ...utils import extract_file_blocks
 
 
 class BobAgent(BaseAgent):
@@ -50,7 +47,7 @@ class BobAgent(BaseAgent):
             if combined_refs and context.tools:
                 references = await self._inject_references(combined_refs, context=context)
             summary = f"{references}\n\n{raw}".strip() if references else raw
-            files = self._extract_file_blocks(raw)
+            files = extract_file_blocks(raw)
             applied: list[str] = []
             if files and context.tools:
                 for spec in files:
@@ -98,42 +95,22 @@ class BobAgent(BaseAgent):
                 )
             raise
 
-    def _extract_file_blocks(self, text: str) -> List[Dict[str, Any]]:
-        specs: List[Dict[str, Any]] = []
-        for match in FILE_BLOCK_PATTERN.finditer(text):
-            header = match.group('header').strip()
-            body = match.group('body')
-            if not body:
-                continue
-            segments = header.split()
-            path = segments[0]
-            mode = 'overwrite'
-            for token in segments[1:]:
-                lowered = token.lower()
-                if lowered in {'append', 'overwrite'}:
-                    mode = lowered
-            specs.append(
-                {
-                    'path': path,
-                    'mode': mode,
-                    'content': body.strip(),
-                }
-            )
-        return specs
-
     def _extract_read_blocks(self, text: str) -> List[str]:
         return [match.group('path').strip() for match in re.finditer(r"\{\{read_file:(?P<path>[^\}]+)\}\}", text) if match.group('path').strip()]
 
     def _discover_shared_paths(self, context: AgentContext) -> List[str]:
-        history = context.metadata.get('history') if context.metadata else ''
-        if not history:
+        metadata = context.metadata or {}
+        artifacts = metadata.get('artifacts', '')
+        history = metadata.get('history', '')
+        corpus = '\n'.join(filter(None, [artifacts, history]))
+        if not corpus:
             return []
         paths: List[str] = []
-        for line in history.splitlines():
+        for line in corpus.splitlines():
             stripped = line.strip()
-            if not stripped.startswith('-'):
+            if not stripped:
                 continue
-            candidate = stripped.lstrip('-').strip()
+            candidate = stripped.lstrip('-').split(':')[-1].strip()
             if not candidate:
                 continue
             candidate = candidate.split(' (')[0].strip()

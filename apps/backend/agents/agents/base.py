@@ -150,14 +150,16 @@ class BaseAgent:
         return str(uuid4())
 
     def _compose_user_message(self, context: AgentContext) -> str:
-        if not context.metadata:
-            return context.user_message
+        metadata = context.metadata or {}
         sections: list[str] = []
-        history = context.metadata.get('history')
+        history = metadata.get('history')
         if history:
             sections.append(f"最近对话（供参考）:\n{history}")
-        files = context.metadata.get('files')
-        if files:
-            sections.append(f"沙箱中文件概览:\n{files}")
+        artifacts = metadata.get('artifacts')
+        if artifacts:
+            sections.append(f"近期文件写入（供参考）:\n{artifacts}")
+        files_overview = metadata.get('files_overview') or metadata.get('files')
+        if files_overview:
+            sections.append(f"沙箱文件概览:\n{files_overview}")
         sections.append(f"当前用户输入:\n{context.user_message}")
         return '\n\n'.join(sections)

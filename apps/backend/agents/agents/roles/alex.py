@@ -1,17 +1,12 @@
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List
 
 from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
 from ...prompts import ALEX_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 from ...llm import LLMProviderError
-
-
-FILE_BLOCK_PATTERN = re.compile(
-    r"```file:(?P<header>[^\n]+)\n(?P<body>.*?)```", re.DOTALL | re.IGNORECASE
-)
+from ...utils import extract_file_blocks
 
 
 class AlexAgent(BaseAgent):
@@ -44,7 +39,7 @@ class AlexAgent(BaseAgent):
                         }
                     )
             raw = ''.join(chunks)
-            files = self._extract_file_blocks(raw)
+            files = extract_file_blocks(raw)
             summary = raw
             applied: list[str] = []
             if files and context.tools:
@@ -91,26 +86,3 @@ class AlexAgent(BaseAgent):
                     }
                 )
             raise
-
-    def _extract_file_blocks(self, text: str) -> List[Dict[str, Any]]:
-        specs: List[Dict[str, Any]] = []
-        for match in FILE_BLOCK_PATTERN.finditer(text):
-            header = match.group('header').strip()
-            body = match.group('body')
-            if not body:
-                continue
-            segments = header.split()
-            path = segments[0]
-            mode = 'overwrite'
-            for token in segments[1:]:
-                lowered = token.lower()
-                if lowered in {'append', 'overwrite'}:
-                    mode = lowered
-            specs.append(
-                {
-                    'path': path,
-                    'mode': mode,
-                    'content': body.strip(),
-                }
-            )
-        return specs

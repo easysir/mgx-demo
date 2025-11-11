@@ -41,6 +41,12 @@ class AgentRuntimeGateway:
         # 构造编排上下文：包含用户输入、会话身份以及可用工具
         history_text = self._collect_history(session_id=session_id, owner_id=owner_id)
         file_context = self._collect_file_context(session_id=session_id, owner_id=owner_id)
+        artifact_context = self._collect_recent_artifacts(session_id=session_id, owner_id=owner_id)
+        metadata: Dict[str, str] = {}
+        if file_context:
+            metadata['files_overview'] = file_context
+        if artifact_context:
+            metadata['artifacts'] = artifact_context
         context = WorkflowContext(
             session_id=session_id,
             user_id=user_id,
@@ -48,7 +54,7 @@ class AgentRuntimeGateway:
             user_message=user_message,
             tools=self._tool_executor,
             history=history_text,
-            metadata={'files': file_context} if file_context else None,
+            metadata=metadata or None,
         )
         # 为该 session 生成 WebSocket 推送器，编排器在生成 token/status 时复用
         stream_publisher = self._build_stream_publisher(session_id)
@@ -100,6 +106,10 @@ class AgentRuntimeGateway:
         recent = messages[-limit:]
         lines = []
         for message in recent:
+            if message.content.startswith('[工具调用]'):
+                continue
+            if message.content.startswith('[') and '写入' in message.content:
+                continue
             sender = message.agent or message.sender
             lines.append(f"{sender}: {message.content}")
         return '\n'.join(lines)
@@ -134,6 +144,34 @@ class AgentRuntimeGateway:
         if not files:
             return ''
         return '\n'.join(f"- {item}" for item in files)
+
+    def _collect_recent_artifacts(self, *, session_id: str, owner_id: str, limit: int = 5) -> str:
+        try:
+            messages = self._store.list_messages(session_id, owner_id)
+        except KeyError:
+            return ''
+        artifacts: list[str] = []
+        for message in reversed(messages):
+            if len(artifacts) >= limit:
+                break
+            content = message.content
+            if '[写入' not in content and '[文件写入' not in content and '[PRD 写入' not in content:
+                continue
+            label_line = content.splitlines()[0]
+            paths = [
+                line.lstrip('- ').split(' (')[0].strip()
+                for line in content.splitlines()[1:]
+                if line.strip().startswith('- ')
+            ]
+            for path in paths:
+                if not path:
+                    continue
+                artifacts.append(f"{label_line}: {path}")
+                if len(artifacts) >= limit:
+                    break
+        if not artifacts:
+            return ''
+        return '\n'.join(f"- {item}" for item in artifacts)
 
     async def _handle_tool_call_event(self, tool_name: str, params: Dict[str, Any]) -> None:
         session_id = params.get('session_id')
