@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from agents.tools import SandboxFileAdapter, FileWriteResult
+from agents.tools import SandboxFileAdapter, FileWriteResult, FileReadResult
 
 from app.services.filesystem import FileService, FileAccessError, file_service
 from app.services.stream import stream_manager
@@ -50,6 +50,24 @@ class SandboxFileCapability(SandboxFileAdapter):
             "size": payload["size"],
             "modified_at": payload["modified_at"],
             "created": payload["created"],
+        }
+
+    async def read_file(
+        self,
+        *,
+        session_id: str,
+        owner_id: str,
+        path: str,
+    ) -> FileReadResult:
+        try:
+            payload = self._files.read_file(session_id=session_id, owner_id=owner_id, path=path)
+        except FileAccessError as exc:
+            raise FileAccessError(str(exc)) from exc
+        return {
+            "path": payload["path"],
+            "size": payload["size"],
+            "modified_at": payload["modified_at"],
+            "content": payload["content"],
         }
 
 

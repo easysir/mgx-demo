@@ -12,6 +12,13 @@ class FileWriteResult(TypedDict):
     created: bool
 
 
+class FileReadResult(TypedDict):
+    path: str
+    size: int
+    modified_at: float
+    content: str
+
+
 class SandboxFileAdapter(Protocol):
     async def write_file(
         self,
@@ -24,3 +31,11 @@ class SandboxFileAdapter(Protocol):
         append: bool = False,
         encoding: str = "utf-8",
     ) -> FileWriteResult: ...
+
+    async def read_file(
+        self,
+        *,
+        session_id: str,
+        owner_id: str,
+        path: str,
+    ) -> FileReadResult: ...
