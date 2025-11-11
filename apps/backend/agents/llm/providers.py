@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any, Dict, Optional, AsyncIterator
 
 import httpx
 from openai import AsyncOpenAI, OpenAIError
+
+logger = logging.getLogger(__name__)
+
 
 
 class LLMProvider:
