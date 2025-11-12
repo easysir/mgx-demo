@@ -9,7 +9,7 @@ import { EditorPanel } from '@/components/editor/EditorPanel';
 import { PreviewPanel } from '@/components/preview/PreviewPanel';
 import { API_BASE, createSession, fetchMessages, listSessions, sendMessage } from '@/lib/api/chat';
 import { useAuth } from '@/hooks/useAuth';
-import type { Message, Session, StreamEvent } from '@/types/chat';
+import type { Message, SenderRole, Session, StreamEvent } from '@/types/chat';
 
 export default function Home() {
   const router = useRouter();
@@ -199,8 +199,9 @@ export default function Home() {
           return;
         }
 
-        const messageId = data.message_id;
+        const messageId = data.message_id ?? '';
         if (!messageId) return;
+        const stableMessageId: string = messageId;
 
         if (data.type === 'tool_call') {
           const eventTimestamp = data.timestamp ? new Date(data.timestamp).toISOString() : new Date().toISOString();
@@ -237,13 +238,16 @@ export default function Home() {
         }
 
         setStreamingMessages((prev) => {
-          const baseMessage: Message = prev[messageId] ?? {
-            id: messageId,
+          const previousEntry = prev[stableMessageId] as Message | undefined;
+          const inferredSender: SenderRole = data.sender ?? 'agent';
+          const inferredTimestamp = previousEntry?.timestamp ?? data.timestamp ?? new Date().toISOString();
+          const baseMessage: Message = previousEntry ?? {
+            id: stableMessageId,
             session_id: activeSessionId,
-            sender: data.sender,
+            sender: inferredSender,
             agent: data.agent ?? null,
             content: '',
-            timestamp: prev[messageId]?.timestamp ?? data.timestamp ?? new Date().toISOString()
+            timestamp: inferredTimestamp
           };
 
           const updated: Message =
@@ -260,14 +264,15 @@ export default function Home() {
                 };
 
           if (data.final) {
-                  mergeMessages({
-                    ...updated,
-                    timestamp: baseMessage.timestamp
-                  });
-            const { [messageId]: _removed, ...rest } = prev;
-            return rest;
+            mergeMessages({
+              ...updated,
+              timestamp: baseMessage.timestamp
+            });
+            const nextState = { ...prev };
+            delete nextState[stableMessageId];
+            return nextState;
           }
-          return { ...prev, [messageId]: updated };
+          return { ...prev, [stableMessageId]: updated };
         });
       } catch (err) {
         console.error('Failed to parse stream event', err);
