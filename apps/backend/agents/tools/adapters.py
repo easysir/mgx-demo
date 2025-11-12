@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypedDict, Optional
+from typing import Protocol, TypedDict, Optional, Dict
 
 
 class FileWriteResult(TypedDict):
@@ -39,3 +39,23 @@ class SandboxFileAdapter(Protocol):
         owner_id: str,
         path: str,
     ) -> FileReadResult: ...
+
+
+class SandboxCommandResult(TypedDict):
+    command: str
+    exit_code: int
+    stdout: str
+    stderr: str
+
+
+class SandboxCommandAdapter(Protocol):
+    async def run_command(
+        self,
+        *,
+        session_id: str,
+        owner_id: str,
+        command: str,
+        cwd: Optional[str] = None,
+        env: Optional[Dict[str, str]] = None,
+        timeout: int = 300,
+    ) -> SandboxCommandResult: ...

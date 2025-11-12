@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.dependencies.auth import get_current_user
 from app.models import Message, SessionCreate, SessionResponse, UserProfile
@@ -43,3 +43,13 @@ async def list_messages(session_id: str, user: UserProfile = Depends(get_current
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session.messages
+
+
+@router.delete("/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_session(session_id: str, user: UserProfile = Depends(get_current_user)) -> None:
+    session = session_repository.get_session(session_id, user.id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    container_manager.destroy_session_container(session_id)
+    file_watcher_manager.stop_watch(session_id)
+    session_repository.delete_session(session_id)

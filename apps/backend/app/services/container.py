@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from threading import Lock
@@ -64,6 +65,8 @@ class SandboxConfig:
     port_range_end: int = int(os.getenv("SANDBOX_PORT_END", "42000"))
     custom_network: str | None = os.getenv("SANDBOX_NETWORK") or None
     extra_env: Dict[str, str] = field(default_factory=lambda: _parse_extra_env(os.getenv("SANDBOX_EXTRA_ENV")))
+    idle_timeout_seconds: int = int(os.getenv("SANDBOX_IDLE_TIMEOUT", "1200"))
+    gc_interval_seconds: int = int(os.getenv("SANDBOX_GC_INTERVAL", "300"))
 
 
 @dataclass(slots=True)
@@ -74,6 +77,7 @@ class SandboxInstance:
     container_id: str
     workspace_path: Path
     port_map: Dict[int, int] = field(default_factory=dict)
+    last_used: float = field(default_factory=lambda: time.time())
 
 
 class PortAllocator:
@@ -116,11 +120,17 @@ class ContainerManager:
         self.config.base_path.mkdir(parents=True, exist_ok=True)
         self._instances: Dict[str, SandboxInstance] = {}
         self._port_allocator = PortAllocator(self.config.port_range_start, self.config.port_range_end)
+        self._metadata_path = self.config.base_path / "sandboxes_meta.json"
+        self._metadata_lock = Lock()
+        self._metadata: Dict[str, Dict[str, object]] = self._load_metadata()
+        self._restore_instances()
 
     def ensure_session_container(self, *, session_id: str, owner_id: str) -> SandboxInstance:
         """Return existing sandbox or create a new one for the session."""
         if session_id in self._instances:
-            return self._instances[session_id]
+            instance = self._instances[session_id]
+            self._touch_instance(instance)
+            return instance
 
         workspace_path = self.config.base_path / session_id
         workspace_path.mkdir(parents=True, exist_ok=True)
@@ -138,7 +148,9 @@ class ContainerManager:
                 workspace_path=workspace_path,
                 port_map=port_map,
             )
+            self._touch_instance(instance)
             self._instances[session_id] = instance
+            self._persist_instance(instance)
             return instance
 
         container_id, port_map = self._start_container(container_name=container_name, workspace_path=workspace_path)
@@ -151,7 +163,9 @@ class ContainerManager:
             workspace_path=workspace_path,
             port_map=port_map,
         )
+        self._touch_instance(instance)
         self._instances[session_id] = instance
+        self._persist_instance(instance)
         return instance
 
     def destroy_session_container(self, session_id: str) -> bool:
@@ -163,6 +177,7 @@ class ContainerManager:
             self._stop_container(instance.container_name)
         finally:
             self._release_ports(instance.port_map)
+            self._remove_metadata(session_id)
         return True
 
     def destroy_all(self, owner_id: Optional[str] = None) -> list[str]:
@@ -176,6 +191,7 @@ class ContainerManager:
                 self._release_ports(instance.port_map)
             finally:
                 self._instances.pop(session_id, None)
+                self._remove_metadata(session_id)
             stopped.append(session_id)
         return stopped
 
@@ -312,6 +328,92 @@ class ContainerManager:
         create = subprocess.run(["docker", "network", "create", network_name], capture_output=True, text=True)
         if create.returncode != 0:
             raise SandboxError(create.stderr.strip() or create.stdout.strip() or f"Failed to create network {network_name}")
+
+    def _touch_instance(self, instance: SandboxInstance) -> None:
+        instance.last_used = time.time()
+
+    def mark_active(self, session_id: str) -> None:
+        instance = self._instances.get(session_id)
+        if instance:
+            self._touch_instance(instance)
+            self._persist_instance(instance)
+
+    def cleanup_idle(self, *, now: Optional[float] = None) -> list[str]:
+        timeout = self.config.idle_timeout_seconds
+        if timeout <= 0:
+            return []
+        now_ts = now or time.time()
+        idle_sessions: list[str] = []
+        for session_id, instance in list(self._instances.items()):
+            if now_ts - instance.last_used >= timeout:
+                idle_sessions.append(session_id)
+        for session_id in idle_sessions:
+            try:
+                self.destroy_session_container(session_id)
+            except SandboxError:
+                continue
+        return idle_sessions
+
+    def _load_metadata(self) -> Dict[str, Dict[str, object]]:
+        if not self._metadata_path.exists():
+            return {}
+        try:
+            raw = json.loads(self._metadata_path.read_text())
+            if isinstance(raw, dict):
+                return raw
+        except Exception:
+            pass
+        return {}
+
+    def _save_metadata(self) -> None:
+        with self._metadata_lock:
+            tmp = self._metadata_path.with_suffix(".tmp")
+            tmp.write_text(json.dumps(self._metadata, ensure_ascii=False, indent=2))
+            tmp.replace(self._metadata_path)
+
+    def _persist_instance(self, instance: SandboxInstance) -> None:
+        entry = {
+            "owner_id": instance.owner_id,
+            "last_used": instance.last_used,
+            "port_map": instance.port_map,
+        }
+        self._metadata[instance.session_id] = entry
+        self._save_metadata()
+
+    def _remove_metadata(self, session_id: str) -> None:
+        if session_id in self._metadata:
+            self._metadata.pop(session_id)
+            self._save_metadata()
+
+    def _restore_instances(self) -> None:
+        restored = 0
+        for session_id, data in list(self._metadata.items()):
+            owner_id = str(data.get("owner_id") or "")
+            if not owner_id:
+                self._metadata.pop(session_id, None)
+                continue
+            container_name = f"mgx-session-{session_id}"
+            container_id = self._find_existing_container(container_name)
+            if not container_id:
+                self._metadata.pop(session_id, None)
+                continue
+            workspace_path = self.config.base_path / session_id
+            port_map = self._inspect_port_bindings(container_name)
+            if not port_map and isinstance(data.get("port_map"), dict):
+                port_map = {int(k): int(v) for k, v in data.get("port_map", {}).items()}
+            instance = SandboxInstance(
+                session_id=session_id,
+                owner_id=owner_id,
+                container_name=container_name,
+                container_id=container_id,
+                workspace_path=workspace_path,
+                port_map=port_map,
+                last_used=float(data.get("last_used") or time.time()),
+            )
+            self._instances[session_id] = instance
+            restored += 1
+        if restored:
+            self._save_metadata()
 
 
 container_manager = ContainerManager()

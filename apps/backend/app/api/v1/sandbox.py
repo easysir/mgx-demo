@@ -1,11 +1,19 @@
 from __future__ import annotations
 
+import subprocess
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.dependencies.auth import get_current_user
 from app.models import SessionCreate, SessionResponse, UserProfile
-from app.services import container_manager, session_repository, SandboxError, file_watcher_manager
+from app.services import (
+    container_manager,
+    session_repository,
+    SandboxError,
+    file_watcher_manager,
+    sandbox_command_service,
+)
 
 
 class SandboxLaunchRequest(BaseModel):
@@ -32,6 +40,21 @@ class SandboxDestroyResponse(BaseModel):
 
 class SandboxDestroyAllResponse(BaseModel):
     stopped_sessions: list[str]
+
+
+class SandboxExecRequest(BaseModel):
+    session_id: str
+    command: str
+    cwd: str | None = None
+    env: dict[str, str] | None = None
+    timeout: int | None = None
+
+
+class SandboxExecResponse(BaseModel):
+    command: str
+    exit_code: int
+    stdout: str
+    stderr: str
 
 
 router = APIRouter()
@@ -97,3 +120,32 @@ async def destroy_all_sandboxes(user: UserProfile = Depends(get_current_user)) -
     for session_id in stopped_sessions:
         file_watcher_manager.stop_watch(session_id)
     return SandboxDestroyAllResponse(stopped_sessions=stopped_sessions)
+
+
+@router.post("/exec", response_model=SandboxExecResponse)
+async def exec_in_sandbox(
+    payload: SandboxExecRequest,
+    user: UserProfile = Depends(get_current_user),
+) -> SandboxExecResponse:
+    session = session_repository.get_session(payload.session_id, user.id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    try:
+        result = await sandbox_command_service.run_command(
+            session_id=payload.session_id,
+            owner_id=session.owner_id,
+            command=payload.command,
+            cwd=payload.cwd,
+            env=payload.env,
+            timeout=payload.timeout or 300,
+        )
+        return SandboxExecResponse(
+            command=result.command,
+            exit_code=result.exit_code,
+            stdout=result.stdout,
+            stderr=result.stderr,
+        )
+    except SandboxError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except subprocess.TimeoutExpired as exc:  # type: ignore[name-defined]
+        raise HTTPException(status_code=408, detail="Command execution timed out") from exc

@@ -60,3 +60,25 @@ docker build -t mgx-sandbox:latest .
 ```
 
 将 `SANDBOX_IMAGE` 指向构建好的镜像即可在网关中使用（详见 `app/services/container.py`）。
+
+### 沙箱命令执行
+
+- 后端提供 `POST /api/sandbox/exec`（参考 `app/api/v1/sandbox.py`），用于在指定会话的沙箱容器内执行命令。请求需要：
+  ```jsonc
+  {
+    "session_id": "<uuid>",
+    "command": "npm run dev -- --host 0.0.0.0 --port 4173",
+    "cwd": "workspace-app",    // 可选，相对于 /workspace 的路径
+    "env": { "NODE_ENV": "development" }, // 可选
+    "timeout": 300             // 可选，单位秒
+  }
+  ```
+- 响应会返回 `stdout`、`stderr`、`exit_code` 供前端展示。
+- Agent 也可以通过新注册的 `sandbox_shell` 工具在编排流程中调用该能力（见 `agents/tools/impl/shell_exec.py`），实现“一键启动/自检 dev server”。
+
+### 自动回收
+
+- 新增环境变量：
+- `SANDBOX_IDLE_TIMEOUT`（默认 1200 秒 ≈ 20 分钟）：沙箱在无人访问/调用命令的情况下超过该时长会被自动销毁并释放端口。
+  - `SANDBOX_GC_INTERVAL`（默认 300 秒）：后台巡检频率。
+- FastAPI 在启动时会拉起 `SandboxIdleReaper`（见 `app/services/sandbox_gc.py`），后台巡检所有会话并清理超时的容器，同时记录日志。仍可通过 API (`/api/sandbox/destroy` / `destroy_all`) 做用户主动清理。

@@ -16,7 +16,7 @@ from shared.types import AgentRole
 
 from .session_repository import SessionRepository, session_repository
 from .stream import stream_manager
-from .capabilities import sandbox_file_capability
+from .capabilities import sandbox_file_capability, sandbox_command_capability
 
 logger = logging.getLogger(__name__)
 AGENT_NAME_SET = set(get_args(AgentRole))
@@ -30,7 +30,10 @@ class AgentRuntimeGateway:
         self._store = store
         self._orchestrator = get_agent_orchestrator()
         self._tool_executor = tools or build_tool_executor(
-            ToolAdapters(sandbox_file=sandbox_file_capability)
+            ToolAdapters(
+                sandbox_file=sandbox_file_capability,
+                sandbox_command=sandbox_command_capability,
+            )
         )
         self._tool_executor.set_event_hook(self._handle_tool_call_event)
 

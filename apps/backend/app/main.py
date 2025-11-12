@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import api_router
+from app.services import sandbox_idle_reaper
 
 
 def create_app() -> FastAPI:
@@ -17,6 +18,14 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(api_router, prefix="/api")
+
+    @app.on_event("startup")
+    async def startup() -> None:
+        await sandbox_idle_reaper.start()
+
+    @app.on_event("shutdown")
+    async def shutdown() -> None:
+        await sandbox_idle_reaper.stop()
 
     @app.get("/healthz", tags=["health"])
     async def health_check() -> dict[str, str]:

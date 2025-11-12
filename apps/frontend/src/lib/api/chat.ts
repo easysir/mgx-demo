@@ -89,3 +89,15 @@ export async function fetchProfile(token: string): Promise<UserProfile> {
   const response = await fetch(`${API_BASE}/auth/me?token=${encodeURIComponent(token)}`);
   return handleResponse<UserProfile>(response);
 }
+
+export async function deleteSession(token: string, sessionId: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/sessions/${sessionId}`, {
+    method: 'DELETE',
+    headers: authHeaders(token)
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    const detail = body?.detail ?? response.statusText;
+    throw new Error(typeof detail === 'string' ? detail : JSON.stringify(detail));
+  }
+}

@@ -1,5 +1,11 @@
 from .executor import Tool, ToolExecutor, ToolExecutionError
-from .adapters import SandboxFileAdapter, FileWriteResult, FileReadResult
+from .adapters import (
+    SandboxFileAdapter,
+    FileWriteResult,
+    FileReadResult,
+    SandboxCommandAdapter,
+    SandboxCommandResult,
+)
 from .impl.file_write import FileWriteTool
 from .impl.file_read import FileReadTool
 from .impl.web_search import WebSearchTool
@@ -10,8 +16,10 @@ __all__ = [
     'ToolExecutor',
     'ToolExecutionError',
     'SandboxFileAdapter',
+    'SandboxCommandAdapter',
     'FileReadResult',
     'FileWriteResult',
+    'SandboxCommandResult',
     'FileWriteTool',
     'FileReadTool',
     'WebSearchTool',

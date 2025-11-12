@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from typing import Any, Dict
 
-from agents.tools import SandboxFileAdapter, FileWriteResult, FileReadResult
+from agents.tools import SandboxFileAdapter, FileWriteResult, FileReadResult, SandboxCommandAdapter, SandboxCommandResult
 
 from app.services.filesystem import FileService, FileAccessError, file_service
+from app.services.sandbox_exec import sandbox_command_service, SandboxCommandService
 from app.services.stream import stream_manager
+from app.services.container import container_manager
 
 
 class SandboxFileCapability(SandboxFileAdapter):
@@ -37,6 +39,8 @@ class SandboxFileCapability(SandboxFileAdapter):
             )
         except FileAccessError as exc:
             raise FileAccessError(str(exc)) from exc
+        finally:
+            container_manager.mark_active(session_id)
 
         await stream_manager.broadcast(
             session_id,
@@ -63,6 +67,8 @@ class SandboxFileCapability(SandboxFileAdapter):
             payload = self._files.read_file(session_id=session_id, owner_id=owner_id, path=path)
         except FileAccessError as exc:
             raise FileAccessError(str(exc)) from exc
+        finally:
+            container_manager.mark_active(session_id)
         return {
             "path": payload["path"],
             "size": payload["size"],
@@ -73,4 +79,42 @@ class SandboxFileCapability(SandboxFileAdapter):
 
 sandbox_file_capability = SandboxFileCapability(file_service)
 
-__all__ = ['sandbox_file_capability', 'SandboxFileCapability']
+
+class SandboxCommandCapability(SandboxCommandAdapter):
+    def __init__(self, service: SandboxCommandService) -> None:
+        self._service = service
+
+    async def run_command(
+        self,
+        *,
+        session_id: str,
+        owner_id: str,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout: int = 300,
+    ) -> SandboxCommandResult:
+        result = await self._service.run_command(
+            session_id=session_id,
+            owner_id=owner_id,
+            command=command,
+            cwd=cwd,
+            env=env,
+            timeout=timeout,
+        )
+        return {
+            "command": result.command,
+            "exit_code": result.exit_code,
+            "stdout": result.stdout,
+            "stderr": result.stderr,
+        }
+
+
+sandbox_command_capability = SandboxCommandCapability(sandbox_command_service)
+
+__all__ = [
+    'sandbox_file_capability',
+    'SandboxFileCapability',
+    'sandbox_command_capability',
+    'SandboxCommandCapability',
+]

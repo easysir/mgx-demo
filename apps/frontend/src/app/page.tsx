@@ -2,12 +2,12 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { EditorPanel } from '@/components/editor/EditorPanel';
 import { PreviewPanel } from '@/components/preview/PreviewPanel';
-import { API_BASE, createSession, fetchMessages, listSessions, sendMessage } from '@/lib/api/chat';
+import { API_BASE, createSession, deleteSession, fetchMessages, listSessions, sendMessage } from '@/lib/api/chat';
 import { useAuth } from '@/hooks/useAuth';
 import type { Message, SenderRole, Session, StreamEvent } from '@/types/chat';
 
@@ -53,6 +53,29 @@ export default function Home() {
   useEffect(() => {
     loadSessions();
   }, [token]);
+
+  const handleDeleteSession = async (id: string) => {
+    if (!token) {
+      router.push('/login');
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm('确定删除该会话吗？此操作不可恢复。');
+      if (!confirmed) return;
+    }
+    setError(null);
+    try {
+      await deleteSession(token, id);
+      if (sessionId === id) {
+        setSessionId(undefined);
+        setMessages([]);
+        setStreamingMessages({});
+      }
+      await loadSessions();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除会话失败');
+    }
+  };
 
   const mergeMessages = useCallback((incoming: Message | Message[]) => {
     const items = Array.isArray(incoming) ? incoming : [incoming];
@@ -153,8 +176,6 @@ export default function Home() {
     setMessages([]);
     loadSessions();
   };
-
-  const recentSessions = useMemo(() => sessions.slice(0, 5), [sessions]);
 
   useEffect(() => {
     if (!sessionId) {
@@ -331,19 +352,29 @@ export default function Home() {
                 </div>
               </div>
               <div className="workspace__history-content">
-                {recentSessions.length === 0 ? (
+                {sessions.length === 0 ? (
                   <p className="workspace__history-empty">还没有会话记录</p>
                 ) : (
                   <ul className="workspace__history-list">
-                    {recentSessions.map((session) => (
+                    {sessions.map((session) => (
                       <li key={session.id}>
                         <div>
                           <strong>{session.title}</strong>
                           <small>{new Date(session.created_at).toLocaleString()}</small>
                         </div>
-                        <button type="button" onClick={() => handleOpenSession(session.id)} disabled={isSending}>
-                          打开
-                        </button>
+                        <div className="workspace__history-actions">
+                          <button type="button" onClick={() => handleOpenSession(session.id)} disabled={isSending}>
+                            打开
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => handleDeleteSession(session.id)}
+                            disabled={isSending}
+                          >
+                            删除
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>

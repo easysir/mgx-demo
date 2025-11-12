@@ -9,7 +9,14 @@ from .session_repository import (
 from .container import container_manager, ContainerManager, SandboxConfig, SandboxInstance, SandboxError
 from .filesystem import file_service, FileService, FileServiceConfig, FileAccessError
 from .watchers import file_watcher_manager, SandboxFileWatcherManager
-from .capabilities import sandbox_file_capability, SandboxFileCapability
+from .capabilities import (
+    sandbox_file_capability,
+    SandboxFileCapability,
+    sandbox_command_capability,
+    SandboxCommandCapability,
+)
+from .sandbox_exec import sandbox_command_service, SandboxCommandService, SandboxCommandResult
+from .sandbox_gc import sandbox_idle_reaper, SandboxIdleReaper
 
 __all__ = [
     "AgentRuntimeGateway",
@@ -33,4 +40,11 @@ __all__ = [
     "SandboxFileWatcherManager",
     "sandbox_file_capability",
     "SandboxFileCapability",
+    "sandbox_command_capability",
+    "SandboxCommandCapability",
+    "sandbox_command_service",
+    "SandboxCommandService",
+    "SandboxCommandResult",
+    "sandbox_idle_reaper",
+    "SandboxIdleReaper",
 ]
