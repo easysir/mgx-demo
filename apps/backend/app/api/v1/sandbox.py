@@ -57,6 +57,18 @@ class SandboxExecResponse(BaseModel):
     stderr: str
 
 
+class SandboxPreviewTarget(BaseModel):
+    container_port: int
+    host_port: int
+    url: str
+
+
+class SandboxPreviewResponse(BaseModel):
+    session_id: str
+    available: bool
+    previews: list[SandboxPreviewTarget]
+
+
 router = APIRouter()
 
 
@@ -149,3 +161,33 @@ async def exec_in_sandbox(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except subprocess.TimeoutExpired as exc:  # type: ignore[name-defined]
         raise HTTPException(status_code=408, detail="Command execution timed out") from exc
+
+
+@router.get("/preview/{session_id}", response_model=SandboxPreviewResponse)
+async def sandbox_preview(
+    session_id: str,
+    user: UserProfile = Depends(get_current_user),
+) -> SandboxPreviewResponse:
+    session = session_repository.get_session(session_id, user.id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    try:
+        instance = container_manager.ensure_session_container(session_id=session.id, owner_id=session.owner_id)
+        file_watcher_manager.ensure_watch(session.id, instance.workspace_path)
+    except SandboxError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    previews: list[SandboxPreviewTarget] = []
+    base_url = container_manager.config.preview_host.rstrip("/")
+    for container_port, host_port in sorted(instance.port_map.items()):
+        if not host_port:
+            continue
+        url = f"{base_url}:{host_port}"
+        previews.append(
+            SandboxPreviewTarget(
+                container_port=container_port,
+                host_port=host_port,
+                url=url,
+            )
+        )
+    return SandboxPreviewResponse(session_id=session.id, available=bool(previews), previews=previews)

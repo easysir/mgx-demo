@@ -5,7 +5,8 @@ import {
   TokenResponse,
   UserProfile,
   FileTreeResponse,
-  FileContentResponse
+  FileContentResponse,
+  SandboxPreviewResponse
 } from '@/types/chat';
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://127.0.0.1:8000/api';
@@ -74,6 +75,13 @@ export async function fetchFileContent(token: string, sessionId: string, path: s
   const url = `${API_BASE}/files/${sessionId}?${new URLSearchParams({ path }).toString()}`;
   const response = await fetch(url, { headers: authHeaders(token) });
   return handleResponse<FileContentResponse>(response);
+}
+
+export async function fetchSandboxPreview(token: string, sessionId: string): Promise<SandboxPreviewResponse> {
+  const response = await fetch(`${API_BASE}/sandbox/preview/${sessionId}`, {
+    headers: authHeaders(token)
+  });
+  return handleResponse<SandboxPreviewResponse>(response);
 }
 
 export async function login(email: string, password: string): Promise<TokenResponse> {

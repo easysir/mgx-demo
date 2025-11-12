@@ -73,3 +73,15 @@ export interface FileContentResponse {
   modified_at: number;
   content: string;
 }
+
+export interface SandboxPreviewTarget {
+  container_port: number;
+  host_port: number;
+  url: string;
+}
+
+export interface SandboxPreviewResponse {
+  session_id: string;
+  available: boolean;
+  previews: SandboxPreviewTarget[];
+}

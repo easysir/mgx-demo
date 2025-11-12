@@ -434,7 +434,11 @@ export default function Home() {
                 </button>
               </div>
               <div className="workspace__right-body">
-                {activeRightTab === 'editor' ? <EditorPanel sessionId={sessionId} fileVersion={fileVersion} /> : <PreviewPanel />}
+                {activeRightTab === 'editor' ? (
+                  <EditorPanel sessionId={sessionId} fileVersion={fileVersion} />
+                ) : (
+                  <PreviewPanel sessionId={sessionId} />
+                )}
               </div>
             </div>
           </div>

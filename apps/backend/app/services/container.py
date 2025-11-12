@@ -67,6 +67,7 @@ class SandboxConfig:
     extra_env: Dict[str, str] = field(default_factory=lambda: _parse_extra_env(os.getenv("SANDBOX_EXTRA_ENV")))
     idle_timeout_seconds: int = int(os.getenv("SANDBOX_IDLE_TIMEOUT", "1200"))
     gc_interval_seconds: int = int(os.getenv("SANDBOX_GC_INTERVAL", "300"))
+    preview_host: str = os.getenv("SANDBOX_PREVIEW_HOST", "http://127.0.0.1").rstrip("/")
 
 
 @dataclass(slots=True)
@@ -153,7 +154,26 @@ class ContainerManager:
             self._persist_instance(instance)
             return instance
 
-        container_id, port_map = self._start_container(container_name=container_name, workspace_path=workspace_path)
+        attempts = 0
+        last_error: SandboxError | None = None
+        while attempts < 3:
+            attempts += 1
+            port_map = self._allocate_ports()
+            try:
+                container_id = self._start_container_with_ports(
+                    container_name=container_name,
+                    workspace_path=workspace_path,
+                    port_map=port_map,
+                )
+                break
+            except SandboxError as exc:
+                last_error = exc
+                self._release_ports(port_map)
+                if "port is already allocated" not in str(exc).lower():
+                    raise
+                continue
+        else:
+            raise last_error or SandboxError("Failed to start sandbox after retries")
 
         instance = SandboxInstance(
             session_id=session_id,
@@ -166,6 +186,12 @@ class ContainerManager:
         self._touch_instance(instance)
         self._instances[session_id] = instance
         self._persist_instance(instance)
+        return instance
+
+    def get_instance(self, session_id: str) -> SandboxInstance | None:
+        instance = self._instances.get(session_id)
+        if instance:
+            self._touch_instance(instance)
         return instance
 
     def destroy_session_container(self, session_id: str) -> bool:
@@ -195,9 +221,8 @@ class ContainerManager:
             stopped.append(session_id)
         return stopped
 
-    def _start_container(self, *, container_name: str, workspace_path: Path) -> tuple[str, Dict[int, int]]:
-        """Run docker container and return container id + port map."""
-        port_map = self._allocate_ports()
+    def _start_container_with_ports(self, *, container_name: str, workspace_path: Path, port_map: Dict[int, int]) -> str:
+        """Run docker container with a predefined port map and return container id."""
         cmd = [
             "docker",
             "run",
@@ -227,9 +252,8 @@ class ContainerManager:
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            self._release_ports(port_map)
             raise SandboxError(f"Failed to start sandbox: {result.stderr.strip() or result.stdout.strip()}")
-        return result.stdout.strip(), port_map
+        return result.stdout.strip()
 
     def _find_existing_container(self, container_name: str) -> Optional[str]:
         result = subprocess.run([
@@ -411,6 +435,7 @@ class ContainerManager:
                 last_used=float(data.get("last_used") or time.time()),
             )
             self._instances[session_id] = instance
+            self._reserve_ports(port_map)
             restored += 1
         if restored:
             self._save_metadata()

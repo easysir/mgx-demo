@@ -19,6 +19,6 @@ venv/
 dist/
 build/
 .cache/
-apps/backend/data/sessions/
+apps/backend/data
 .env
 .env.*
