@@ -26,6 +26,8 @@ RUN corepack enable && \
       pm2@latest \
       serve@latest
 
+RUN mkdir -p /workspace /workspace/logs
+
 ENV CHOKIDAR_USEPOLLING=1 \
     WATCHPACK_POLLING=true \
     BROWSER=none

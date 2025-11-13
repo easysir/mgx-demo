@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import shlex
 import subprocess
 from dataclasses import dataclass
@@ -20,8 +21,9 @@ class SandboxCommandResult:
 class SandboxCommandService:
     """Execute shell commands inside an existing sandbox container."""
 
-    def __init__(self, *, default_shell: str = "/bin/bash") -> None:
+    def __init__(self, *, default_shell: str = "/bin/bash", default_cwd: Optional[str] = None) -> None:
         self._shell = default_shell
+        self._default_cwd = self._normalize_default_cwd(default_cwd)
 
     async def run_command(
         self,
@@ -58,7 +60,7 @@ class SandboxCommandService:
         env: Dict[str, str],
         timeout: int,
     ) -> SandboxCommandResult:
-        workdir = cwd.strip() if cwd else ""
+        workdir = cwd.strip() if cwd else self._default_cwd
         if workdir and workdir.startswith("/"):
             resolved = workdir
         elif workdir:
@@ -86,6 +88,13 @@ class SandboxCommandService:
             stdout=result.stdout,
             stderr=result.stderr,
         )
+    
+    def _normalize_default_cwd(self, value: Optional[str]) -> str:
+        env_value = value if value is not None else os.getenv("SANDBOX_PROJECT_ROOT", ".")
+        if not env_value:
+            return ""
+        normalized = env_value.strip().strip("./")
+        return normalized
 
 
 sandbox_command_service = SandboxCommandService()

@@ -14,7 +14,7 @@ class FileAccessError(RuntimeError):
 
 @dataclass(slots=True)
 class FileServiceConfig:
-    project_root: Path = Path(os.getenv("SANDBOX_PROJECT_ROOT", "workspace"))
+    project_root: Path = Path(os.getenv("SANDBOX_PROJECT_ROOT", "."))
     max_entries: int = int(os.getenv("SANDBOX_FILE_LIMIT", "2000"))
     max_depth: int = int(os.getenv("SANDBOX_TREE_DEPTH", "4"))
 
