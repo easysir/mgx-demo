@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
-from ...prompts import IRIS_SYSTEM_PROMPT
+from ..prompts import IRIS_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 
 

@@ -5,7 +5,7 @@ import re
 from typing import Any, Dict, Optional, Tuple
 
 from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
-from ...prompts import MIKE_PLAN_PROMPT, MIKE_REVIEW_PROMPT, MIKE_SUMMARY_PROMPT, MIKE_SYSTEM_PROMPT
+from ..prompts import MIKE_PLAN_PROMPT, MIKE_REVIEW_PROMPT, MIKE_SUMMARY_PROMPT, MIKE_SYSTEM_PROMPT
 
 
 class MikeAgent(BaseAgent):

@@ -4,7 +4,7 @@ import re
 from typing import Any, Dict, List
 
 from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
-from ...prompts import EMMA_SYSTEM_PROMPT
+from ..prompts import EMMA_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 from ...llm import LLMProviderError
 from ...utils import extract_file_blocks

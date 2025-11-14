@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
-from ...prompts import DAVID_SYSTEM_PROMPT
+from ..prompts import DAVID_SYSTEM_PROMPT
 
 
 class DavidAgent(BaseAgent):
