@@ -41,7 +41,7 @@ shared/            # app 与 agents 共享的类型定义
 Agent 在执行写文件 / 预览任务时会使用独立的 Docker 沙箱。项目提供了一个基础镜像定义：
 
 ```
-apps/backend/agents/docker/sandbox/Dockerfile
+apps/container/docker/sandbox/Dockerfile
 ```
 
 镜像特性：
@@ -54,12 +54,12 @@ apps/backend/agents/docker/sandbox/Dockerfile
 本地构建并推送镜像：
 
 ```bash
-cd apps/backend/agents/docker/sandbox
+cd apps/container/docker/sandbox
 docker build -t mgx-sandbox:latest .
 # 可选：docker push <registry>/mgx-sandbox:latest
 ```
 
-将 `SANDBOX_IMAGE` 指向构建好的镜像即可在网关中使用（详见 `app/services/container.py`）。
+将 `SANDBOX_IMAGE` 指向构建好的镜像即可在网关中使用（详见 `apps/container/container_app/services/container.py`）。
 
 ### 沙箱命令执行
 
@@ -81,4 +81,4 @@ docker build -t mgx-sandbox:latest .
 - 新增环境变量：
 - `SANDBOX_IDLE_TIMEOUT`（默认 1200 秒 ≈ 20 分钟）：沙箱在无人访问/调用命令的情况下超过该时长会被自动销毁并释放端口。
   - `SANDBOX_GC_INTERVAL`（默认 300 秒）：后台巡检频率。
-- FastAPI 在启动时会拉起 `SandboxIdleReaper`（见 `app/services/sandbox_gc.py`），后台巡检所有会话并清理超时的容器，同时记录日志。仍可通过 API (`/api/sandbox/destroy` / `destroy_all`) 做用户主动清理。
+- FastAPI 在启动时会拉起 `SandboxIdleReaper`（见 `apps/container/container_app/services/sandbox_gc.py`），后台巡检所有会话并清理超时的容器，同时记录日志。仍可通过 API (`/api/sandbox/destroy` / `destroy_all`) 做用户主动清理。

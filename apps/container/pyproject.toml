@@ -1,0 +1,9 @@
+[project]
+name = "mgx-container"
+version = "0.1.0"
+description = "Sandbox container + filesystem services for MGX"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "python-dotenv>=1.0.0"
+]

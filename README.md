@@ -5,7 +5,7 @@
 MGX 是一套“对话式研发工作台”，用户只需在 Chat 面板描述需求，Mike 领衔的六人 AI 团队（Emma/Bob/Alex/David/Iris）便会协同完成需求分析、架构设计、编码到沙箱、数据/研究支持等任务：
 
 - **实时流式反馈**：`LLMService` 调用 Deepseek/OpenAI 等模型并将 token/status/error 事件通过 WebSocket 推送到前端，使用户实时看到每个 Agent 的进度。
-- **Docker 沙箱 + 预览**：`app/services/container.py` 管理 per-session 沙箱，文件变更会触发 watcher 推送；未来还将串联预览/圈选编辑，形成“对话 → 代码 → 预览”的闭环。
+- **Docker 沙箱 + 预览**：`apps/container/container_app/services/container.py` 管理 per-session 沙箱，文件变更会触发 watcher 推送；未来还将串联预览/圈选编辑，形成“对话 → 代码 → 预览”的闭环。
 
 ## 目录结构
 
@@ -15,6 +15,8 @@ apps/
     app/        # FastAPI 网关（API、依赖、模型、服务）
     agents/     # 多 Agent Runtime（编排、LLM、工具、提示）
     shared/     # Python 侧共享模块/类型
+  container/
+    container_app/  # 沙箱容器 / 文件系统 / GC 能力
   frontend/
     src/app/        # Next.js App Router（workspace page、auth 页面等）
     src/components/ # ChatPanel、EditorPanel、PreviewPanel 等 UI 组件
@@ -64,7 +66,7 @@ pnpm dev                # Turbo run dev --parallel, 前后端并行
 - **FastAPI 网关层**：`apps/backend/app` 暴露认证、会话、聊天、文件与沙箱接口，所有 HTTP/WebSocket 都经过 JWT 认证（`app/dependencies/auth.py`）；`stream.py` 负责房间广播流式 token/status/file_change 事件。
 - **多 Agent 编排层**：`agents/workflows/orchestrator.py` 让 Mike 以状态机方式调度 Emma/Bob/Alex/David/Iris，`agents/llm/service.py` 提供统一 LLMService（默认 Deepseek（API 考量，演示用），可切换 provider），`agents/tools` 封装 ToolExecutor + file_write 等工具（后续待扩展）。
 - **上下文管理与记忆**：`app/services/agent_runtime.py` 在每轮对话前为 WorkflowContext 组装三类 metadata —— 最近对话摘要、沙箱文件概览、最近写入的文档（PRD/调研/技术方案），并由各 Agent 的 `_compose_user_message` 注入 prompt，使多轮对话能够记住“刚才发生了什么”“沙箱里有哪些文件”，同时不会把原始文档全文塞入 prompt。
-- **沙箱与工具能力**：`app/services/container.py` 管理 Docker 容器，`filesystem.py`/`capabilities.py` 负责文件读写与 `file_change` 推送，`agents/tools/file_write.py` 则把这些能力暴露给 Alex 等角色，实现“对话→代码文件”的闭环。
+- **沙箱与工具能力**：`apps/container/container_app/services/container.py` 管理 Docker 容器，`container_app/services/filesystem.py`/`app/services/capabilities.py` 负责文件读写与 `file_change` 推送，`agents/tools/file_write.py` 则把这些能力暴露给 Alex 等角色，实现“对话→代码文件”的闭环。
 - **状态管理与持久化演进**：当前 SessionRepository 在内存基础上扩展了文件存储，接口已经抽象（`app/services/session_repository.py`），方便 Phase 2 接入 PostgreSQL/Redis 与向量存储，实现 docs 中规划的短期/长期记忆。
 
 ## Agent Runtime 亮点
