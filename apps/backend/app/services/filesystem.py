@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,29 @@ class FileAccessError(RuntimeError):
     """Raised when sandbox files cannot be accessed."""
 
 
+class FileValidationError(FileAccessError):
+    """Raised when written file does not pass validation."""
+
+
+class FileValidator:
+    """Optional hook to verify file contents after writes."""
+
+    def validate(self, path: Path, content: str) -> None:
+        pass
+
+
+class DefaultFileValidator(FileValidator):
+    JSON_EXTS = {".json", ".jsonc"}
+
+    def validate(self, path: Path, content: str) -> None:
+        suffix = path.suffix.lower()
+        if suffix in self.JSON_EXTS:
+            try:
+                json.loads(content)
+            except json.JSONDecodeError as exc:
+                raise FileValidationError(f"{path} 不是合法 JSON: {exc}") from exc
+
+
 @dataclass(slots=True)
 class FileServiceConfig:
     project_root: Path = Path(os.getenv("SANDBOX_PROJECT_ROOT", "."))
@@ -20,9 +44,15 @@ class FileServiceConfig:
 
 
 class FileService:
-    def __init__(self, manager: ContainerManager, config: Optional[FileServiceConfig] = None) -> None:
+    def __init__(
+        self,
+        manager: ContainerManager,
+        config: Optional[FileServiceConfig] = None,
+        validator: Optional[FileValidator] = None,
+    ) -> None:
         self.manager = manager
         self.config = config or FileServiceConfig()
+        self.validator = validator or DefaultFileValidator()
 
     def _resolve_base(self, *, session_id: str, owner_id: str) -> Path:
         instance = self.manager.ensure_session_container(session_id=session_id, owner_id=owner_id)
@@ -143,11 +173,30 @@ class FileService:
         mode = "a" if append else "w"
         with target.open(mode, encoding=encoding) as handler:
             handler.write(content)
-        stat = target.stat()
+        previous_content: str | None = None
+        if existed:
+            previous_content = target.read_text(encoding=encoding, errors="ignore")
+        stat = None
         project_root = self._resolve_base(session_id=session_id, owner_id=owner_id)
         rel_path = str(target.relative_to(project_root))
         if rel_path == ".":
             rel_path = target.name
+        stat = target.stat()
+        if self.validator:
+            try:
+                validated_content = target.read_text(encoding="utf-8", errors="ignore")
+                self.validator.validate(target, validated_content)
+            except FileValidationError as exc:
+                if previous_content is None:
+                    try:
+                        target.unlink()
+                    except FileNotFoundError:
+                        pass
+                else:
+                    with target.open("w", encoding="utf-8") as handler:
+                        handler.write(previous_content)
+                raise FileAccessError(str(exc)) from exc
+
         return {
             "name": target.name,
             "path": rel_path,

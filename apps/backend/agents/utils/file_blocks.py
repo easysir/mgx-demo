@@ -4,6 +4,7 @@ from typing import Dict, List
 
 FILE_FENCE_START = "```file:"
 FILE_FENCE_END = "```endfile"
+FILE_FENCE_ALT_END = "```"
 
 
 def extract_file_blocks(text: str) -> List[Dict[str, str]]:
@@ -21,13 +22,16 @@ def extract_file_blocks(text: str) -> List[Dict[str, str]]:
         body_start = header_end + 1
         end = text.find(FILE_FENCE_END, body_start)
         if end == -1:
+            alt_end = text.find(FILE_FENCE_ALT_END, body_start)
             next_start = text.find(FILE_FENCE_START, body_start)
-            if next_start == -1:
+            candidates = [pos for pos in [alt_end, next_start] if pos != -1]
+            if candidates:
+                cutoff = min(candidates)
+                body = text[body_start:cutoff]
+                index = cutoff if cutoff == next_start else cutoff + len(FILE_FENCE_ALT_END)
+            else:
                 body = text[body_start:]
                 index = length
-            else:
-                body = text[body_start:next_start]
-                index = next_start
         else:
             body = text[body_start:end]
             newline_after = text.find('\n', end)

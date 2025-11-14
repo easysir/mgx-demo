@@ -84,11 +84,21 @@ export function PreviewPanel({ sessionId }: PreviewPanelProps) {
   return (
     <section className="preview-panel">
       <header>
-        <div>
-          <p className="eyebrow">预览 / Deploy</p>
-          <h2>Live Preview</h2>
-        </div>
         <div className="preview-panel__actions">
+          {targets.length > 1 && (
+            <div className="preview-panel__target-tabs preview-panel__target-tabs--inline">
+              {targets.map((target) => (
+                <button
+                  key={target.container_port}
+                  type="button"
+                  className={target.url === activeUrl ? 'active' : ''}
+                  onClick={() => setActiveUrl(target.url)}
+                >
+                  Port {target.container_port} → {target.host_port}
+                </button>
+              ))}
+            </div>
+          )}
           <button type="button" onClick={refreshPreview} disabled={!canLoad || isLoading}>
             {isLoading ? '刷新中...' : '刷新'}
           </button>
@@ -101,28 +111,9 @@ export function PreviewPanel({ sessionId }: PreviewPanelProps) {
       </header>
 
       <div className="preview-panel__frame">
-        <div className="preview-panel__frame-bar">
-          <span />
-          <span />
-          <span />
-        </div>
-        {targets.length > 1 && (
-          <div className="preview-panel__target-tabs">
-            {targets.map((target) => (
-              <button
-                key={target.container_port}
-                type="button"
-                className={target.url === activeUrl ? 'active' : ''}
-                onClick={() => setActiveUrl(target.url)}
-              >
-                Port {target.container_port} → {target.host_port}
-              </button>
-            ))}
-          </div>
-        )}
         <div className="preview-panel__screen">
-          {!sessionId && <p>选择或创建会话以启动沙箱。</p>}
-          {sessionId && statusText && <p className="preview-panel__status">{statusText}</p>}
+          {/* {!sessionId && <p>选择或创建会话以启动沙箱。</p>}
+          {sessionId && statusText && <p className="preview-panel__status">{statusText}</p>} */}
           {activeUrl ? (
             <iframe key={activeUrl} src={activeUrl} title="Sandbox Preview" allow="accelerometer; clipboard-read; clipboard-write; encrypted-media; gyroscope; picture-in-picture" />
           ) : (

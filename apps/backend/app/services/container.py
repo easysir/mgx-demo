@@ -9,6 +9,8 @@ from pathlib import Path
 from threading import Lock
 from typing import Dict, Optional
 
+ALLOWED_PREVIEW_PORTS: list[int] = [4173, 5173, 3000]
+
 
 class SandboxError(RuntimeError):
     """Raised when sandbox/container operations fail."""
@@ -59,7 +61,7 @@ class SandboxConfig:
     disable_network: bool = os.getenv("SANDBOX_DISABLE_NETWORK", "0") == "1"
     start_command: str = os.getenv("SANDBOX_COMMAND", "tail -f /dev/null")
     exposed_ports: list[int] = field(
-        default_factory=lambda: _parse_port_list(os.getenv("SANDBOX_EXPOSED_PORTS"), [4173, 5173, 3000])
+        default_factory=lambda: _parse_port_list(os.getenv("SANDBOX_EXPOSED_PORTS"), ALLOWED_PREVIEW_PORTS)
     )
     port_range_start: int = int(os.getenv("SANDBOX_PORT_START", "41000"))
     port_range_end: int = int(os.getenv("SANDBOX_PORT_END", "42000"))
@@ -118,6 +120,7 @@ class ContainerManager:
 
     def __init__(self, config: Optional[SandboxConfig] = None) -> None:
         self.config = config or SandboxConfig()
+        self.config.exposed_ports = ALLOWED_PREVIEW_PORTS.copy()
         self.config.base_path.mkdir(parents=True, exist_ok=True)
         self._instances: Dict[str, SandboxInstance] = {}
         self._port_allocator = PortAllocator(self.config.port_range_start, self.config.port_range_end)

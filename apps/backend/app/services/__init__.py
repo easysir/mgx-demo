@@ -6,7 +6,14 @@ from .session_repository import (
     InMemorySessionRepository,
     FileSessionRepository,
 )
-from .container import container_manager, ContainerManager, SandboxConfig, SandboxInstance, SandboxError
+from .container import (
+    container_manager,
+    ContainerManager,
+    SandboxConfig,
+    SandboxInstance,
+    SandboxError,
+    ALLOWED_PREVIEW_PORTS,
+)
 from .filesystem import file_service, FileService, FileServiceConfig, FileAccessError
 from .watchers import file_watcher_manager, SandboxFileWatcherManager
 from .capabilities import (
@@ -31,6 +38,7 @@ __all__ = [
     "ContainerManager",
     "SandboxConfig",
     "SandboxInstance",
+    "ALLOWED_PREVIEW_PORTS",
     "SandboxError",
     "file_service",
     "FileService",

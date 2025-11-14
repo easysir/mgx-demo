@@ -13,6 +13,7 @@ from app.services import (
     SandboxError,
     file_watcher_manager,
     sandbox_command_service,
+    ALLOWED_PREVIEW_PORTS,
 )
 
 
@@ -179,7 +180,10 @@ async def sandbox_preview(
 
     previews: list[SandboxPreviewTarget] = []
     base_url = container_manager.config.preview_host.rstrip("/")
+    allowed_ports = set(ALLOWED_PREVIEW_PORTS)
     for container_port, host_port in sorted(instance.port_map.items()):
+        if container_port not in allowed_ports:
+            continue
         if not host_port:
             continue
         url = f"{base_url}:{host_port}"
