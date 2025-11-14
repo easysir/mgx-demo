@@ -9,7 +9,21 @@ from pathlib import Path
 from threading import Lock
 from typing import Dict, Optional
 
+from dotenv import dotenv_values
+
 ALLOWED_PREVIEW_PORTS: list[int] = [4173, 5173, 3000]
+APP_ENV_PATH = Path(__file__).resolve().parent.parent / ".env"
+APP_ENV_VALUES: Dict[str, Optional[str]] = dotenv_values(APP_ENV_PATH) if APP_ENV_PATH.exists() else {}
+
+
+def _config_value(key: str, default: Optional[str] = None) -> Optional[str]:
+    """配置读取顺序: app/.env -> 环境变量 -> 默认值。"""
+    if key in APP_ENV_VALUES and APP_ENV_VALUES[key] is not None:
+        return APP_ENV_VALUES[key]
+    env_value = os.getenv(key)
+    if env_value is not None:
+        return env_value
+    return default
 
 
 class SandboxError(RuntimeError):
@@ -54,22 +68,26 @@ def _parse_extra_env(raw: str | None) -> Dict[str, str]:
 class SandboxConfig:
     """Runtime configuration for sandbox containers."""
 
-    image: str = os.getenv("SANDBOX_IMAGE", "mgx-sandbox:latest")
-    base_path: Path = Path(os.getenv("SANDBOX_BASE_PATH", "/tmp/mgx/sandboxes"))
-    cpu_limit: str = os.getenv("SANDBOX_CPU", "1")
-    memory_limit: str = os.getenv("SANDBOX_MEMORY", "1g")
-    disable_network: bool = os.getenv("SANDBOX_DISABLE_NETWORK", "0") == "1"
-    start_command: str = os.getenv("SANDBOX_COMMAND", "tail -f /dev/null")
+    image: str = _config_value("SANDBOX_IMAGE", "mgx-sandbox:latest")
+    base_path: Path = Path(_config_value("SANDBOX_BASE_PATH", "/tmp/mgx/sandboxes"))
+    cpu_limit: str = _config_value("SANDBOX_CPU", "1")
+    memory_limit: str = _config_value("SANDBOX_MEMORY", "1g")
+    disable_network: bool = (_config_value("SANDBOX_DISABLE_NETWORK", "0") or "0") == "1"
+    start_command: str = _config_value("SANDBOX_COMMAND", "tail -f /dev/null")
     exposed_ports: list[int] = field(
-        default_factory=lambda: _parse_port_list(os.getenv("SANDBOX_EXPOSED_PORTS"), ALLOWED_PREVIEW_PORTS)
+        default_factory=lambda: _parse_port_list(
+            _config_value("SANDBOX_EXPOSED_PORTS"), ALLOWED_PREVIEW_PORTS
+        )
     )
-    port_range_start: int = int(os.getenv("SANDBOX_PORT_START", "41000"))
-    port_range_end: int = int(os.getenv("SANDBOX_PORT_END", "42000"))
-    custom_network: str | None = os.getenv("SANDBOX_NETWORK") or None
-    extra_env: Dict[str, str] = field(default_factory=lambda: _parse_extra_env(os.getenv("SANDBOX_EXTRA_ENV")))
-    idle_timeout_seconds: int = int(os.getenv("SANDBOX_IDLE_TIMEOUT", "1200"))
-    gc_interval_seconds: int = int(os.getenv("SANDBOX_GC_INTERVAL", "300"))
-    preview_host: str = os.getenv("SANDBOX_PREVIEW_HOST", "http://127.0.0.1").rstrip("/")
+    port_range_start: int = int(_config_value("SANDBOX_PORT_START", "41000"))
+    port_range_end: int = int(_config_value("SANDBOX_PORT_END", "42000"))
+    custom_network: str | None = _config_value("SANDBOX_NETWORK") or None
+    extra_env: Dict[str, str] = field(
+        default_factory=lambda: _parse_extra_env(_config_value("SANDBOX_EXTRA_ENV"))
+    )
+    idle_timeout_seconds: int = int(_config_value("SANDBOX_IDLE_TIMEOUT", "1200"))
+    gc_interval_seconds: int = int(_config_value("SANDBOX_GC_INTERVAL", "300"))
+    preview_host: str = (_config_value("SANDBOX_PREVIEW_HOST", "http://127.0.0.1") or "http://127.0.0.1").rstrip("/")
 
 
 @dataclass(slots=True)
@@ -84,6 +102,8 @@ class SandboxInstance:
 
 
 class PortAllocator:
+    """本机端口分配器，确保在指定范围内分配不冲突的端口。"""
+
     def __init__(self, start: int, end: int) -> None:
         if start >= end:
             raise ValueError("Sandbox port range is invalid")
@@ -342,6 +362,7 @@ class ContainerManager:
         return port_map
 
     def _ensure_network(self, network_name: str) -> None:
+        """确保自定义 Docker 网络存在，不存在则创建。"""
         if not network_name:
             return
         result = subprocess.run(
