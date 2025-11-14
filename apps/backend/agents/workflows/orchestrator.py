@@ -64,6 +64,7 @@ class SequentialWorkflow(AgentWorkflow):
         next_agent = self._extract_agent_hint(plan_result.content, available_agents)
 
         iterations = 0
+        
         while next_agent and iterations < self.MAX_ITERATIONS:
             iterations += 1
             await self._emit_status(

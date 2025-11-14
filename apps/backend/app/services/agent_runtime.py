@@ -11,7 +11,7 @@ from agents import get_agent_orchestrator
 from agents.runtime import WorkflowContext
 from agents.tools import ToolExecutor, ToolAdapters, build_tool_executor
 from app.models import Message
-from .filesystem import file_service, FileAccessError
+from .container import file_service, FileAccessError
 from shared.types import AgentRole
 
 from .session_repository import SessionRepository, session_repository
