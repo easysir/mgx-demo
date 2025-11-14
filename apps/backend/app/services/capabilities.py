@@ -4,10 +4,15 @@ from typing import Any, Dict
 
 from agents.tools import SandboxFileAdapter, FileWriteResult, FileReadResult, SandboxCommandAdapter, SandboxCommandResult
 
-from app.services.filesystem import FileService, FileAccessError, file_service
-from app.services.sandbox_exec import sandbox_command_service, SandboxCommandService
+from app.services.container import (
+    container_manager,
+    FileService,
+    FileAccessError,
+    file_service,
+    SandboxCommandService,
+    sandbox_command_service,
+)
 from app.services.stream import stream_manager
-from app.services.container import container_manager
 
 
 class SandboxFileCapability(SandboxFileAdapter):
