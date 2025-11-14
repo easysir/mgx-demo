@@ -18,7 +18,7 @@ class FileValidationError(FileAccessError):
 
 
 class FileValidator:
-    """Optional hook to verify file contents after writes."""
+    """一个可选的钩子，用于在写入后校验文件内容。"""
 
     def validate(self, path: Path, content: str) -> None:
         pass
@@ -50,11 +50,13 @@ class FileService:
         config: Optional[FileServiceConfig] = None,
         validator: Optional[FileValidator] = None,
     ) -> None:
+        # 注入容器管理器、配置以及可选的内容校验器
         self.manager = manager
         self.config = config or FileServiceConfig()
         self.validator = validator or DefaultFileValidator()
 
     def _resolve_base(self, *, session_id: str, owner_id: str) -> Path:
+        """定位当前会话对应容器的工作目录，并保证目录存在。"""
         instance = self.manager.ensure_session_container(session_id=session_id, owner_id=owner_id)
         base_path = (instance.workspace_path / self.config.project_root).resolve()
         if not base_path.exists():
@@ -62,6 +64,7 @@ class FileService:
         return base_path
 
     def _resolve_path(self, *, session_id: str, owner_id: str, relative_path: str) -> Path:
+        """把用户输入的相对路径转换为沙箱内安全的绝对路径。"""
         base_path = self._resolve_base(session_id=session_id, owner_id=owner_id)
         candidate = (base_path / relative_path.lstrip("/")) if relative_path else base_path
         resolved = candidate.resolve()
@@ -78,6 +81,7 @@ class FileService:
         depth: int = 2,
         include_hidden: bool = False,
     ) -> list[dict]:
+        """列出指定目录的文件树，受最大深度与条数限制。"""
         if depth <= 0:
             raise FileAccessError("深度必须大于 0")
         depth = min(depth, self.config.max_depth)
@@ -93,6 +97,7 @@ class FileService:
             return '' if rel_str == '.' else rel_str
 
         def walk(path: Path, current_depth: int) -> list[dict]:
+            # DFS 遍历文件树，统计条目并生成结构化描述
             nonlocal total_entries
             if current_depth > depth:
                 return []
@@ -159,6 +164,7 @@ class FileService:
         overwrite: bool = True,
         append: bool = False,
     ) -> dict:
+        """写入/追加文件，写后可触发自定义校验，失败则回滚。"""
         path = path.strip()
         if not path or path.endswith("/"):
             raise FileAccessError("请提供有效的文件路径，不能是目录")
@@ -184,6 +190,7 @@ class FileService:
         stat = target.stat()
         if self.validator:
             try:
+                # 校验写入结果，若失败则根据 previous_content 做回滚
                 validated_content = target.read_text(encoding="utf-8", errors="ignore")
                 self.validator.validate(target, validated_content)
             except FileValidationError as exc:

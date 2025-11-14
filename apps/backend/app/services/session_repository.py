@@ -46,11 +46,15 @@ class SessionRepository(ABC):
 
 class InMemorySessionRepository(SessionRepository):
     def __init__(self) -> None:
+        # 在内存中用一个 dict 维护所有 session
         self._sessions: Dict[str, Session] = {}
 
     def create_session(self, owner_id: str, payload: Optional[SessionCreate] = None) -> Session:
+        """创建新会话并立即写入内存，没有持久化。"""
         session_id = str(uuid4())
+        # todo initial_title 最大长度需要限制
         initial_title = payload.title if payload and payload.title else f'Session {session_id[:8]}'
+        # 为会话生成基础元数据
         session = Session(
             id=session_id,
             title=initial_title,
@@ -72,6 +76,7 @@ class InMemorySessionRepository(SessionRepository):
         return session.messages if session else []
 
     def list_sessions(self, owner_id: str) -> List[Session]:
+        """返回当前用户拥有的所有内存会话。"""
         return [session for session in self._sessions.values() if session.owner_id == owner_id]
 
     def append_message(
@@ -84,10 +89,12 @@ class InMemorySessionRepository(SessionRepository):
         owner_id: Optional[str] = None,
         message_id: Optional[str] = None,
     ) -> Message:
+        """向指定会话追加一条消息，若不存在会话则抛出异常。"""
         session = self.get_session(session_id, owner_id)
         if not session:
             raise KeyError(f'Session {session_id} not found')
 
+        # 构建消息实体，时间戳使用写入时刻
         message = Message(
             id=message_id or str(uuid4()),
             session_id=session_id,
@@ -106,6 +113,7 @@ class InMemorySessionRepository(SessionRepository):
 
 class FileSessionRepository(SessionRepository):
     def __init__(self, base_path: Optional[Path] = None) -> None:
+        # 基于文件的存储需要持久化根目录与索引文件
         default_root = Path(os.getenv('SESSION_DATA_PATH', './data/sessions'))
         self.base_path = (base_path or default_root).resolve()
         self.base_path.mkdir(parents=True, exist_ok=True)
@@ -114,6 +122,7 @@ class FileSessionRepository(SessionRepository):
         self._index = self._load_index()
 
     def create_session(self, owner_id: str, payload: Optional[SessionCreate] = None) -> Session:
+        """创建新会话并写入磁盘，同时更新索引文件。"""
         session_id = str(uuid4())
         initial_title = payload.title if payload and payload.title else f'Session {session_id[:8]}'
         session = Session(
@@ -124,6 +133,7 @@ class FileSessionRepository(SessionRepository):
             messages=[],
         )
         with self._lock:
+            # 先写入单个会话文件，再刷新内存索引并落盘
             self._save_session(session)
             owners = self._index.setdefault('owners', {})
             owner_sessions = owners.setdefault(owner_id, [])
@@ -139,6 +149,7 @@ class FileSessionRepository(SessionRepository):
         return session
 
     def list_sessions(self, owner_id: str) -> List[Session]:
+        """按索引读取用户的会话列表，并尝试用首条用户消息重命名。"""
         owners = self._index.get('owners', {})
         session_ids = owners.get(owner_id, [])
         sessions: List[Session] = []
@@ -146,6 +157,7 @@ class FileSessionRepository(SessionRepository):
             session = self._load_session(session_id)
             if session:
                 if session.title.startswith('Session '):
+                    # 第一次出现用户输入时，用其内容作为更友好的标题
                     first_user = next((m for m in session.messages if m.sender == 'user'), None)
                     if first_user:
                         session.title = first_user.content[:60] or session.title
@@ -166,11 +178,13 @@ class FileSessionRepository(SessionRepository):
         owner_id: Optional[str] = None,
         message_id: Optional[str] = None,
     ) -> Message:
+        """追加消息并立即刷新对应的会话文件，保证磁盘状态最新。"""
         with self._lock:
             session = self.get_session(session_id, owner_id)
             if not session:
                 raise KeyError(f'Session {session_id} not found')
             if session.title.startswith('Session ') and sender == 'user':
+                # 用用户首条消息的前 60 个字符重命名 session
                 session.title = content[:60] or session.title
             message = Message(
                 id=message_id or str(uuid4()),
@@ -190,6 +204,7 @@ class FileSessionRepository(SessionRepository):
             path = self._session_path(session_id)
             if path.exists():
                 path.unlink()
+            # 移除索引中的 session 记录并同步写回
             owners = self._index.get('owners', {})
             for owner_sessions in owners.values():
                 if session_id in owner_sessions:
@@ -200,6 +215,7 @@ class FileSessionRepository(SessionRepository):
         return self.base_path / f'{session_id}.json'
 
     def _save_session(self, session: Session) -> None:
+        """写入单个会话文件，使用临时文件保证原子性。"""
         data = jsonable_encoder(session)
         path = self._session_path(session.id)
         tmp = path.with_suffix('.tmp')
@@ -207,6 +223,7 @@ class FileSessionRepository(SessionRepository):
         tmp.replace(path)
 
     def _load_session(self, session_id: str) -> Optional[Session]:
+        """读取磁盘上的会话文件并转成模型，失败则返回 None。"""
         path = self._session_path(session_id)
         if not path.exists():
             return None
@@ -217,6 +234,7 @@ class FileSessionRepository(SessionRepository):
             return None
 
     def _load_index(self) -> Dict[str, Dict[str, List[str]]]:
+        """加载 owners 索引，异常时回退到空结构。"""
         if not self.index_path.exists():
             return {'owners': {}}
         try:
@@ -225,6 +243,7 @@ class FileSessionRepository(SessionRepository):
             return {'owners': {}}
 
     def _write_index(self) -> None:
+        """持久化当前索引，同样采用临时文件策略。"""
         tmp = self.index_path.with_suffix('.tmp')
         tmp.write_text(json.dumps(self._index, ensure_ascii=False, indent=2))
         tmp.replace(self.index_path)
