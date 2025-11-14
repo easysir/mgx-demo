@@ -8,15 +8,15 @@ from datetime import timezone
 from typing import Any, Awaitable, Callable, Dict, List, get_args
 
 from agents import get_agent_orchestrator
-from agents.runtime import WorkflowContext
-from agents.tools import ToolExecutor, ToolAdapters, build_tool_executor
+from agents.tools import ToolExecutor
+from agents.tools.registry import get_tool_executor, register_event_hook
+from agents.container.capabilities import sandbox_file_capability
+from agents.context import register_session_store
 from app.models import Message
-from .container import file_service, FileAccessError
 from shared.types import AgentRole
 
 from .session_repository import SessionRepository, session_repository
 from .stream import stream_manager
-from .capabilities import sandbox_file_capability, sandbox_command_capability
 
 logger = logging.getLogger(__name__)
 AGENT_NAME_SET = set(get_args(AgentRole))
@@ -28,41 +28,27 @@ class AgentRuntimeGateway:
     def __init__(self, store: SessionRepository, tools: ToolExecutor | None = None) -> None:
         # Session 仓库用于持久化消息，工具执行器负责给 Agent 暴露文件等能力
         self._store = store
+        self._tool_executor = tools or get_tool_executor()
+        register_event_hook(self._handle_tool_call_event)
+        sandbox_file_capability.set_file_change_hook(self._handle_file_change_event)
+        register_session_store(self._store)
         self._orchestrator = get_agent_orchestrator()
-        self._tool_executor = tools or build_tool_executor(
-            ToolAdapters(
-                sandbox_file=sandbox_file_capability,
-                sandbox_command=sandbox_command_capability,
-            )
-        )
-        self._tool_executor.set_event_hook(self._handle_tool_call_event)
 
     async def handle_user_turn(
         self, *, session_id: str, owner_id: str, user_id: str, user_message: str
     ) -> List[Message]:
         """Forward a user turn to the orchestrator and persist agent replies."""
-        # 构造编排上下文：包含用户输入、会话身份以及可用工具
-        history_text = self._collect_history(session_id=session_id, owner_id=owner_id)
-        file_context = self._collect_file_context(session_id=session_id, owner_id=owner_id)
-        artifact_context = self._collect_recent_artifacts(session_id=session_id, owner_id=owner_id)
-        metadata: Dict[str, str] = {}
-        if file_context:
-            metadata['files_overview'] = file_context
-        if artifact_context:
-            metadata['artifacts'] = artifact_context
-        context = WorkflowContext(
-            session_id=session_id,
-            user_id=user_id,
-            owner_id=owner_id,
-            user_message=user_message,
-            tools=self._tool_executor,
-            history=history_text,
-            metadata=metadata or None,
-        )
         # 为该 session 生成 WebSocket 推送器，编排器在生成 token/status 时复用
         stream_publisher = self._build_stream_publisher(session_id)
         # 交给 orchestrator 运行 Mike 状态机，拿到各 Agent 的 dispatch 结果
-        dispatches = await self._orchestrator.handle_user_turn(context, stream_publisher=stream_publisher)
+        dispatches = await self._orchestrator.handle_user_turn(
+            session_id=session_id,
+            owner_id=owner_id,
+            user_id=user_id,
+            user_message=user_message,
+            tools=self._tool_executor,
+            stream_publisher=stream_publisher,
+        )
         # 将所有 Agent 输出回写 SessionStore，确保 REST 与回放一致
         return [
             self._store.append_message(
@@ -99,83 +85,6 @@ class AgentRuntimeGateway:
 
         return publish
 
-    def _collect_history(self, *, session_id: str, owner_id: str, limit: int = 8) -> str:
-        try:
-            messages = self._store.list_messages(session_id, owner_id)
-        except KeyError:
-            return ''
-        if not messages:
-            return ''
-        recent = messages[-limit:]
-        lines = []
-        for message in recent:
-            if message.content.startswith('[工具调用]'):
-                continue
-            if message.content.startswith('[') and '写入' in message.content:
-                continue
-            sender = message.agent or message.sender
-            lines.append(f"{sender}: {message.content}")
-        return '\n'.join(lines)
-
-    def _collect_file_context(self, *, session_id: str, owner_id: str, limit: int = 6) -> str:
-        try:
-            entries = file_service.list_tree(
-                session_id=session_id,
-                owner_id=owner_id,
-                root='',
-                depth=2,
-                include_hidden=False,
-            )
-        except FileAccessError:
-            return ''
-        except Exception:
-            return ''
-        files: list[str] = []
-
-        def visit(nodes: list[dict]) -> None:
-            for node in nodes:
-                if len(files) >= limit:
-                    return
-                path = node.get('path') or node.get('name', '')
-                if node.get('type') == 'file':
-                    files.append(f"{path} (size {node.get('size', 0)})")
-                children = node.get('children')
-                if children:
-                    visit(children)
-
-        visit(entries)
-        if not files:
-            return ''
-        return '\n'.join(f"- {item}" for item in files)
-
-    def _collect_recent_artifacts(self, *, session_id: str, owner_id: str, limit: int = 5) -> str:
-        try:
-            messages = self._store.list_messages(session_id, owner_id)
-        except KeyError:
-            return ''
-        artifacts: list[str] = []
-        for message in reversed(messages):
-            if len(artifacts) >= limit:
-                break
-            content = message.content
-            if '[写入' not in content and '[文件写入' not in content and '[PRD 写入' not in content:
-                continue
-            label_line = content.splitlines()[0]
-            paths = [
-                line.lstrip('- ').split(' (')[0].strip()
-                for line in content.splitlines()[1:]
-                if line.strip().startswith('- ')
-            ]
-            for path in paths:
-                if not path:
-                    continue
-                artifacts.append(f"{label_line}: {path}")
-                if len(artifacts) >= limit:
-                    break
-        if not artifacts:
-            return ''
-        return '\n'.join(f"- {item}" for item in artifacts)
-
     async def _handle_tool_call_event(self, tool_name: str, params: Dict[str, Any]) -> None:
         session_id = params.get('session_id')
         owner_id = params.get('owner_id')
@@ -208,6 +117,12 @@ class AgentRuntimeGateway:
             await stream_manager.broadcast(session_id, event_payload)
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning('Failed to broadcast tool event for %s: %s', session_id, exc)
+
+    async def _handle_file_change_event(self, session_id: str, payload: Dict[str, Any]) -> None:
+        try:
+            await stream_manager.broadcast(session_id, payload)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning('Failed to broadcast file change for %s: %s', session_id, exc)
 
 
 

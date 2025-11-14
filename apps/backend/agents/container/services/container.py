@@ -12,7 +12,7 @@ from typing import Dict, Optional
 from dotenv import dotenv_values
 
 ALLOWED_PREVIEW_PORTS: list[int] = [4173, 5173, 3000]
-APP_ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+APP_ENV_PATH = Path(__file__).resolve().parents[1] / ".env"
 APP_ENV_VALUES: Dict[str, Optional[str]] = dotenv_values(APP_ENV_PATH) if APP_ENV_PATH.exists() else {}
 
 

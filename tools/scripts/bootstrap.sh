@@ -31,7 +31,7 @@ if command -v docker >/dev/null 2>&1; then
   if docker image inspect mgx-sandbox:latest >/dev/null 2>&1; then
     echo "    Docker image mgx-sandbox:latest already present, skipping build."
   else
-    (cd "$ROOT_DIR/apps/container/docker/sandbox" && docker build -t mgx-sandbox:latest .)
+    (cd "$ROOT_DIR/apps/backend/agents/container/docker/sandbox" && docker build -t mgx-sandbox:latest .)
   fi
 else
   echo "docker command not found; skip sandbox image build. Install Docker and rerun setup if needed." >&2

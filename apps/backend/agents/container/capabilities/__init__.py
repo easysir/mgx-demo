@@ -1,18 +1,22 @@
+"""Sandbox capabilities exposed as agent tool adapters."""
+
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Awaitable, Callable
 
-from agents.tools import SandboxFileAdapter, FileWriteResult, FileReadResult, SandboxCommandAdapter, SandboxCommandResult
-
-from app.services.container import (
-    container_manager,
-    FileService,
-    FileAccessError,
-    file_service,
-    SandboxCommandService,
-    sandbox_command_service,
+from agents.tools import (
+    SandboxFileAdapter,
+    FileWriteResult,
+    FileReadResult,
+    SandboxCommandAdapter,
+    SandboxCommandResult,
 )
-from app.services.stream import stream_manager
+
+from ..services.container import container_manager
+from ..services.filesystem import FileService, FileAccessError, file_service
+from ..services.sandbox_exec import SandboxCommandService, sandbox_command_service
+
+FileChangeHook = Callable[[str, Dict[str, Any]], Awaitable[None]]
 
 
 class SandboxFileCapability(SandboxFileAdapter):
@@ -20,6 +24,10 @@ class SandboxFileCapability(SandboxFileAdapter):
 
     def __init__(self, service: FileService) -> None:
         self._files = service
+        self._hook: FileChangeHook | None = None
+
+    def set_file_change_hook(self, hook: FileChangeHook | None) -> None:
+        self._hook = hook
 
     async def write_file(
         self,
@@ -30,7 +38,7 @@ class SandboxFileCapability(SandboxFileAdapter):
         content: str,
         overwrite: bool = True,
         append: bool = False,
-        encoding: str = "utf-8",
+        encoding: str = 'utf-8',
     ) -> FileWriteResult:
         try:
             payload = self._files.write_file(
@@ -47,18 +55,19 @@ class SandboxFileCapability(SandboxFileAdapter):
         finally:
             container_manager.mark_active(session_id)
 
-        await stream_manager.broadcast(
-            session_id,
-            {
-                "type": "file_change",
-                "paths": [payload["path"]],
-            },
-        )
+        if self._hook:
+            await self._hook(
+                session_id,
+                {
+                    'type': 'file_change',
+                    'paths': [payload['path']],
+                },
+            )
         return {
-            "path": payload["path"],
-            "size": payload["size"],
-            "modified_at": payload["modified_at"],
-            "created": payload["created"],
+            'path': payload['path'],
+            'size': payload['size'],
+            'modified_at': payload['modified_at'],
+            'created': payload['created'],
         }
 
     async def read_file(
@@ -75,10 +84,10 @@ class SandboxFileCapability(SandboxFileAdapter):
         finally:
             container_manager.mark_active(session_id)
         return {
-            "path": payload["path"],
-            "size": payload["size"],
-            "modified_at": payload["modified_at"],
-            "content": payload["content"],
+            'path': payload['path'],
+            'size': payload['size'],
+            'modified_at': payload['modified_at'],
+            'content': payload['content'],
         }
 
 
@@ -108,10 +117,10 @@ class SandboxCommandCapability(SandboxCommandAdapter):
             timeout=timeout,
         )
         return {
-            "command": result.command,
-            "exit_code": result.exit_code,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
+            'command': result.command,
+            'exit_code': result.exit_code,
+            'stdout': result.stdout,
+            'stderr': result.stderr,
         }
 
 
@@ -122,4 +131,5 @@ __all__ = [
     'SandboxFileCapability',
     'sandbox_command_capability',
     'SandboxCommandCapability',
+    'FileChangeHook',
 ]

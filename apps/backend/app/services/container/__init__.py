@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from .._container_loader import _CONTAINER_APP_PATH  # noqa: F401
-from container_app import (  # type: ignore[import]
+from agents.container import (
     ALLOWED_PREVIEW_PORTS,
     ContainerManager,
     FileAccessError,

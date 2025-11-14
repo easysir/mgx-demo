@@ -14,6 +14,4 @@ def get_agent_orchestrator() -> AgentExecutor:
             workflow=SequentialWorkflow(),
         )
     return _ORCHESTRATOR
-
-
 __all__ = ['AgentDispatch', 'AgentExecutor', 'WorkflowContext', 'get_agent_orchestrator']

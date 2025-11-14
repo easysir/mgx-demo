@@ -24,12 +24,6 @@ from .container import (
     sandbox_idle_reaper,
 )
 from .watchers import file_watcher_manager, SandboxFileWatcherManager
-from .capabilities import (
-    sandbox_file_capability,
-    SandboxFileCapability,
-    sandbox_command_capability,
-    SandboxCommandCapability,
-)
 
 __all__ = [
     "AgentRuntimeGateway",
@@ -56,9 +50,6 @@ __all__ = [
     "SandboxFileWatcherManager",
     "file_watcher_manager",
     "sandbox_file_capability",
-    "SandboxFileCapability",
-    "sandbox_command_capability",
-    "SandboxCommandCapability",
     "sandbox_command_service",
     "sandbox_idle_reaper",
 ]
