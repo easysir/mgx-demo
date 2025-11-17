@@ -38,6 +38,7 @@ class SessionRepository(ABC):
         agent: Optional[AgentRole] = None,
         owner_id: Optional[str] = None,
         message_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
     ) -> Message: ...
 
     @abstractmethod
@@ -88,6 +89,7 @@ class InMemorySessionRepository(SessionRepository):
         agent: Optional[AgentRole] = None,
         owner_id: Optional[str] = None,
         message_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
     ) -> Message:
         """向指定会话追加一条消息，若不存在会话则抛出异常。"""
         session = self.get_session(session_id, owner_id)
@@ -100,7 +102,7 @@ class InMemorySessionRepository(SessionRepository):
             session_id=session_id,
             sender=sender,
             content=content,
-            timestamp=datetime.utcnow(),
+            timestamp=timestamp or datetime.utcnow(),
             agent=agent,
         )
         session.messages.append(message)
@@ -177,6 +179,7 @@ class FileSessionRepository(SessionRepository):
         agent: Optional[AgentRole] = None,
         owner_id: Optional[str] = None,
         message_id: Optional[str] = None,
+        timestamp: Optional[datetime] = None,
     ) -> Message:
         """追加消息并立即刷新对应的会话文件，保证磁盘状态最新。"""
         with self._lock:
@@ -191,7 +194,7 @@ class FileSessionRepository(SessionRepository):
                 session_id=session_id,
                 sender=sender,
                 content=content,
-                timestamp=datetime.utcnow(),
+                timestamp=timestamp or datetime.utcnow(),
                 agent=agent,
             )
             session.messages.append(message)

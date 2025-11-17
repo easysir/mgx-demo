@@ -19,8 +19,8 @@ agents/
 ### 核心流程
 1. FastAPI 网关接收用户消息，调用 `AgentRuntimeGateway`。
 2. Gateway 创建 `WorkflowContext` 并调用 `AgentExecutor.handle_user_turn`。
-3. Orchestrator 基于 `config/registry.py` 中的注册信息与 `workflows/` 策略生成一组 `AgentDispatch`。
-4. Gateway 将 dispatch 结果写入会话存储，再通过 WebSocket/API 回传给前端。
+3. Orchestrator 基于 `config/registry.py` 中的注册信息与 `workflows/` 策略逐条推送流式事件，StreamContext 统一处理推流与落库。
+4. Gateway 拿到本轮新增的 `Message` 列表，通过 WebSocket/API 回传给前端。
 
 ### 亮点
 - **配置驱动的 Agent Registry**：`config/registry.py` 定义 Agent 元数据（名称、描述、默认工具），可按需启用/禁用，为后续扩编或精简团队提供开关。

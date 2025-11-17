@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional, get_args
 
 from agents import get_agent_orchestrator
@@ -41,9 +41,9 @@ class AgentRuntimeGateway:
         """Forward a user turn to the orchestrator and persist agent replies."""
         # 为该 session 生成 WebSocket 推送器，编排器在生成 token/status 时复用
         stream_publisher = self._build_stream_publisher(session_id)
-        # 交给 orchestrator 运行 Mike 状态机，拿到各 Agent 的 dispatch 结果
+        # 交给 orchestrator 运行 Mike 状态机，StreamContext 内部会记录落库顺序
         persist_fn = self._build_persist_fn(session_id, owner_id)
-        dispatches = await self._orchestrator.handle_user_turn(
+        messages = await self._orchestrator.handle_user_turn(
             session_id=session_id,
             owner_id=owner_id,
             user_id=user_id,
@@ -52,7 +52,7 @@ class AgentRuntimeGateway:
             stream_publisher=stream_publisher,
             persist_fn=persist_fn,
         )
-        return dispatches
+        return messages
 
     async def execute_tool(
         self,
@@ -79,12 +79,13 @@ class AgentRuntimeGateway:
 
     def _build_persist_fn(
         self, session_id: str, owner_id: str
-    ) -> Callable[[SenderRole, Optional[AgentRole], str, Optional[str]], Message]:
+    ) -> Callable[[SenderRole, Optional[AgentRole], str, Optional[str], Optional[datetime]], Message]:
         def persist(
             sender: SenderRole,
             agent: Optional[AgentRole],
             content: str,
             message_id: Optional[str],
+            timestamp: Optional[datetime],
         ) -> Message:
             return self._store.append_message(
                 session_id=session_id,
@@ -93,6 +94,7 @@ class AgentRuntimeGateway:
                 content=content,
                 owner_id=owner_id,
                 message_id=message_id,
+                timestamp=timestamp,
             )
 
         return persist

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from typing import Any, Dict, List
 
 from ..base import AgentContext, AgentRunResult, BaseAgent
@@ -72,6 +73,8 @@ class EmmaAgent(BaseAgent):
                 content=summary,
                 message_id=message_id,
                 final=True,
+                persist_final=True,
+                timestamp=datetime.utcnow().isoformat(),
             )
             return AgentRunResult(agent=self.name, sender='agent', content=summary, message_id=message_id)
         except LLMProviderError as exc:

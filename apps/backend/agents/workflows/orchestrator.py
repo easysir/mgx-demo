@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
 from shared.types import AgentRole
 
 from ..config import AgentRegistry
-from ..runtime.executor import AgentDispatch, AgentWorkflow, WorkflowContext
+from ..runtime.executor import AgentWorkflow, WorkflowContext
 from ..agents.base import AgentContext, AgentRunResult
 from ..agents.roles.alex import AlexAgent
 from ..agents.roles.bob import BobAgent
@@ -43,21 +44,18 @@ class SequentialWorkflow(AgentWorkflow):
         self,
         context: WorkflowContext,
         registry: AgentRegistry,
-    ) -> list[AgentDispatch]:
-        dispatches: list[AgentDispatch] = []
+    ) -> None:
         available_agents = [agent for agent in AGENT_EXECUTION_ORDER if registry.is_enabled(agent)]
         available_agents_descriptions = registry.describe_agents(available_agents)
         agent_context = self._build_agent_context(context)
         agent_contributions: list[Tuple[AgentRole, str]] = []
 
         await self._emit_status(
-            dispatches,
             context.session_id,
             'Mike 正在评估任务，准备调度团队。',
         )
 
         plan_result = await self._mike_agent.plan_next_agent(agent_context, available_agents_descriptions)
-        dispatches.append(self._dispatch_from_result(plan_result))
         next_agent = self._extract_agent_hint(plan_result.content, available_agents)
 
         iterations = 0
@@ -65,13 +63,11 @@ class SequentialWorkflow(AgentWorkflow):
         while next_agent and iterations < self.MAX_ITERATIONS:
             iterations += 1
             await self._emit_status(
-                dispatches,
                 context.session_id,
                 f'Mike 将任务交给 {next_agent}。',
             )
 
             agent_result = await self._run_agent(next_agent, agent_context)
-            dispatches.append(self._dispatch_from_result(agent_result))
             agent_contributions.append((next_agent, agent_result.content))
 
             available_agents = [agent for agent in available_agents if agent != next_agent]
@@ -81,21 +77,18 @@ class SequentialWorkflow(AgentWorkflow):
                 agent_result.content,
                 available_agents,
             )
-            dispatches.append(self._dispatch_from_result(review_result))
 
             next_agent = self._extract_agent_hint(review_result.content, available_agents)
 
         await self._emit_status(
-            dispatches,
             context.session_id,
             'Mike 收齐团队结果，准备向用户汇报结论与下一步。',
         )
-        summary_result = await self._mike_agent.summarize_team(
+        await self._mike_agent.summarize_team(
             agent_context,
             agent_contributions,
         )
-        dispatches.append(self._dispatch_from_result(summary_result))
-        return dispatches
+        return None
 
     def _build_agent_context(self, context: WorkflowContext) -> AgentContext:
         metadata: Dict[str, Any] = {}
@@ -122,29 +115,18 @@ class SequentialWorkflow(AgentWorkflow):
             raise ValueError(f'未知 Agent: {agent_name}')
         return await agent.act(agent_context)
 
-    def _dispatch_from_result(self, result: AgentRunResult) -> AgentDispatch:
-        return AgentDispatch(
-            sender=result.sender,
-            agent=result.agent,
-            content=result.content,
-            message_id=result.message_id,
-        )
-
     # 向调度结果和流式通道发送状态型消息，用于提示前端当前进度
     async def _emit_status(
         self,
-        dispatches: list[AgentDispatch],
         session_id: str,
         content: str,
     ) -> None:
         message_id = self._new_message_id()
-        dispatches.append(
-            AgentDispatch(sender='status', agent='Mike', content=content, message_id=message_id)
-        )
         await publish_status(
             content=content,
             agent='Mike',
             message_id=message_id,
+            timestamp=datetime.utcnow().isoformat(),
         )
 
     def _extract_agent_hint(self, text: str, candidates: list[AgentRole]) -> Optional[AgentRole]:

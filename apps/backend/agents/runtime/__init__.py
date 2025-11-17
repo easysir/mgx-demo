@@ -1,4 +1,4 @@
-from .executor import AgentDispatch, AgentExecutor, WorkflowContext
+from .executor import AgentExecutor, WorkflowContext
 from ..config import default_registry
 from ..workflows.orchestrator import SequentialWorkflow
 
@@ -14,4 +14,4 @@ def get_agent_orchestrator() -> AgentExecutor:
             workflow=SequentialWorkflow(),
         )
     return _ORCHESTRATOR
-__all__ = ['AgentDispatch', 'AgentExecutor', 'WorkflowContext', 'get_agent_orchestrator']
+__all__ = ['AgentExecutor', 'WorkflowContext', 'get_agent_orchestrator']

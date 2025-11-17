@@ -7,6 +7,7 @@ agent microservice communicating via RPC/queue.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Optional, Callable, Awaitable, Dict, Any, TYPE_CHECKING
 
 from shared.types import AgentRole, SenderRole
@@ -18,14 +19,6 @@ from ..stream import StreamContext, push_stream_context, pop_stream_context
 
 if TYPE_CHECKING:  # pragma: no cover
     from app.models import Message
-
-@dataclass(frozen=True)
-class AgentDispatch:
-    sender: SenderRole
-    content: str
-    agent: Optional[AgentRole] = None
-    message_id: Optional[str] = None
-
 
 @dataclass(frozen=True)
 class WorkflowContext:
@@ -46,7 +39,7 @@ class AgentWorkflow:
         self,
         context: WorkflowContext,
         registry: AgentRegistry,
-    ) -> list[AgentDispatch]:
+    ) -> None:
         raise NotImplementedError
 
 
@@ -69,9 +62,9 @@ class AgentExecutor:
         user_message: str,
         tools: Optional[ToolExecutor],
         stream_publisher: Optional[StreamPublisher] = None,
-        persist_fn: Callable[[SenderRole, Optional[AgentRole], str, Optional[str]], 'Message'],
+        persist_fn: Callable[[SenderRole, Optional[AgentRole], str, Optional[str], Optional[datetime]], 'Message'],
     ) -> list['Message']:
-        """Generate agent dispatches for a user turn."""
+        """Run the workflow for a user turn and return persisted messages."""
         payload = gather_context_payload(session_id=session_id, owner_id=owner_id)
         context = WorkflowContext(
             session_id=session_id,
@@ -90,12 +83,7 @@ class AgentExecutor:
         )
         token = push_stream_context(stream_context)
         try:
-            dispatches = await self._workflow.generate(context, self._registry)
+            await self._workflow.generate(context, self._registry)
         finally:
             pop_stream_context(token)
-        entries = [
-            (dispatch.sender, dispatch.agent, dispatch.content, dispatch.message_id)
-            for dispatch in dispatches
-        ]
-        stream_context.record_dispatches(entries)
         return stream_context.persisted_messages()

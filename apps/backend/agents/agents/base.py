@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
 
@@ -91,12 +92,15 @@ class BaseAgent:
                 )
             full_text = ''.join(chunks)
             final_text = final_transform(full_text) if final_transform else full_text
+            final_timestamp = datetime.utcnow().isoformat()
             await publish_token(
                 sender=sender,
                 agent=self.name,
                 content=final_text,
                 message_id=message_id,
                 final=True,
+                persist_final=True,
+                timestamp=final_timestamp,
             )
             return AgentRunResult(agent=self.name, sender=sender, content=final_text, message_id=message_id)
         except LLMProviderError as exc:
@@ -120,6 +124,8 @@ class BaseAgent:
             content=content,
             message_id=message_id,
             final=True,
+            persist_final=True,
+            timestamp=datetime.utcnow().isoformat(),
         )
         return AgentRunResult(agent=self.name, sender=sender, content=content, message_id=message_id)
 

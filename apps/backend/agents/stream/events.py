@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Awaitable, Callable, Dict, Iterable, Optional
 from uuid import uuid4
 
@@ -25,6 +26,16 @@ def _resolve_publisher(explicit: Optional[StreamPublisher]) -> Optional[StreamPu
     return ctx.publisher if ctx else None
 
 
+def _ensure_timestamp(timestamp: Optional[str]) -> str:
+    if timestamp:
+        try:
+            datetime.fromisoformat(timestamp)
+            return timestamp
+        except ValueError:
+            pass
+    return datetime.utcnow().isoformat()
+
+
 async def publish_event(event: EventPayload, publisher: Optional[StreamPublisher] = None) -> None:
     # 最底层的发送函数：publisher 可能为空（例如未开启流式）
     resolved = _resolve_publisher(publisher)
@@ -41,8 +52,20 @@ async def publish_token(
     message_id: str,
     final: bool,
     publisher: Optional[StreamPublisher] = None,
+    persist_final: bool = False,
+    timestamp: Optional[str] = None,
 ) -> None:
     # token 事件：供 LLM 流式输出复用
+    ts = _ensure_timestamp(timestamp)
+    ctx = current_stream_context()
+    if final and persist_final and ctx:
+        ctx.record_message(
+            sender=sender,
+            agent=agent,
+            content=content,
+            message_id=message_id,
+            timestamp=ts,
+        )
     await publish_event(
         token_event(
             sender=sender,
@@ -50,6 +73,7 @@ async def publish_token(
             content=content,
             message_id=message_id,
             final=final,
+            timestamp=ts,
         ),
         publisher,
     )
@@ -61,14 +85,27 @@ async def publish_status(
     agent: Optional[AgentRole | str] = None,
     message_id: Optional[str] = None,
     publisher: Optional[StreamPublisher] = None,
+    timestamp: Optional[str] = None,
+    persist: bool = True,
 ) -> str:
     # 状态提示：默认由 Mike 或具体 agent 发送
     resolved_id = _message_id(message_id)
+    ts = _ensure_timestamp(timestamp)
+    ctx = current_stream_context()
+    if persist and ctx:
+        ctx.record_message(
+            sender='status',
+            agent=agent,  # type: ignore[arg-type]
+            content=content,
+            message_id=resolved_id,
+            timestamp=ts,
+        )
     await publish_event(
         status_event(
             content=content,
             agent=agent,
             message_id=resolved_id,
+            timestamp=ts,
         ),
         publisher,
     )
@@ -81,14 +118,27 @@ async def publish_error(
     agent: Optional[AgentRole | str],
     message_id: Optional[str] = None,
     publisher: Optional[StreamPublisher] = None,
+    timestamp: Optional[str] = None,
+    persist: bool = True,
 ) -> str:
     # 异常提示：展示在聊天区域，供用户知晓失败原因
     resolved_id = _message_id(message_id)
+    ts = _ensure_timestamp(timestamp)
+    ctx = current_stream_context()
+    if persist and ctx:
+        ctx.record_message(
+            sender='status',
+            agent=agent,  # type: ignore[arg-type]
+            content=content,
+            message_id=resolved_id,
+            timestamp=ts,
+        )
     await publish_event(
         error_event(
             content=content,
             agent=agent,
             message_id=resolved_id,
+            timestamp=ts,
         ),
         publisher,
     )
@@ -104,9 +154,20 @@ async def publish_tool_call(
     message_id: Optional[str] = None,
     timestamp: Optional[str] = None,
     publisher: Optional[StreamPublisher] = None,
+    persist: bool = True,
 ) -> str:
     # 工具调用事件：带上工具名、调用者与时间戳
     resolved_id = _message_id(message_id)
+    ts = _ensure_timestamp(timestamp)
+    ctx = current_stream_context()
+    if persist and ctx:
+        ctx.record_message(
+            sender='agent',
+            agent=agent,
+            content=content,
+            message_id=resolved_id,
+            timestamp=ts,
+        )
     await publish_event(
         tool_call_event(
             tool=tool,
@@ -114,7 +175,7 @@ async def publish_tool_call(
             invoker=invoker,
             agent=agent,
             message_id=resolved_id,
-            timestamp=timestamp,
+            timestamp=ts,
         ),
         publisher,
     )
@@ -128,9 +189,10 @@ def token_event(
     content: str,
     message_id: str,
     final: bool,
+    timestamp: Optional[str] = None,
 ) -> EventPayload:
     # token 类型在前端代表流式消息（final 控制是否落入历史）
-    return {
+    event: EventPayload = {
         'type': 'token',
         'sender': sender,
         'agent': agent,
@@ -138,6 +200,9 @@ def token_event(
         'message_id': message_id,
         'final': final,
     }
+    if timestamp:
+        event['timestamp'] = timestamp
+    return event
 
 
 def status_event(
@@ -146,8 +211,9 @@ def status_event(
     # status 类型用于展示阶段进度或 shell 执行日志
     agent: Optional[AgentRole | str],
     message_id: str,
+    timestamp: Optional[str] = None,
 ) -> EventPayload:
-    return {
+    event: EventPayload = {
         'type': 'status',
         'sender': 'status',
         'agent': agent,
@@ -155,6 +221,9 @@ def status_event(
         'message_id': message_id,
         'final': True,
     }
+    if timestamp:
+        event['timestamp'] = timestamp
+    return event
 
 
 def error_event(
@@ -162,9 +231,10 @@ def error_event(
     content: str,
     agent: Optional[AgentRole | str],
     message_id: str,
+    timestamp: Optional[str] = None,
 ) -> EventPayload:
     # error 类型提示不可恢复的失败，sender 统一标记为 status
-    return {
+    event: EventPayload = {
         'type': 'error',
         'sender': 'status',
         'agent': agent,
@@ -172,6 +242,9 @@ def error_event(
         'message_id': message_id,
         'final': True,
     }
+    if timestamp:
+        event['timestamp'] = timestamp
+    return event
 
 
 def message_event(
