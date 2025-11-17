@@ -23,7 +23,8 @@ from .container import (
     sandbox_command_service,
     sandbox_idle_reaper,
 )
-from .watchers import file_watcher_manager, SandboxFileWatcherManager
+from agents.container.watchers import file_watcher_manager, SandboxFileWatcherManager
+from .stream import stream_manager
 
 __all__ = [
     "AgentRuntimeGateway",
@@ -53,3 +54,8 @@ __all__ = [
     "sandbox_command_service",
     "sandbox_idle_reaper",
 ]
+
+
+file_watcher_manager.set_broadcast_fn(
+    lambda session_id, payload: stream_manager.broadcast(session_id, payload)
+)

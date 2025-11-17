@@ -20,6 +20,7 @@ from .services.sandbox_exec import (
     sandbox_command_service,
 )
 from .services.sandbox_gc import SandboxIdleReaper, sandbox_idle_reaper
+from .watchers import SandboxFileWatcherManager, file_watcher_manager
 
 __all__ = [
     "ALLOWED_PREVIEW_PORTS",
@@ -37,4 +38,6 @@ __all__ = [
     "sandbox_command_service",
     "SandboxIdleReaper",
     "sandbox_idle_reaper",
+    "SandboxFileWatcherManager",
+    "file_watcher_manager",
 ]
