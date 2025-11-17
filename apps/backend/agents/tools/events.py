@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, get_args
 
 from shared.types import AgentRole
@@ -31,5 +31,5 @@ async def stream_tool_call_event(tool_name: str, params: Dict[str, Any]) -> None
         content=content,
         invoker=str(invoker),
         agent=agent_name,
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
     )

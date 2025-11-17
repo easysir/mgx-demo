@@ -4,7 +4,7 @@ import json
 import logging
 import os
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Dict, List, Optional
@@ -59,7 +59,7 @@ class InMemorySessionRepository(SessionRepository):
         session = Session(
             id=session_id,
             title=initial_title,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             owner_id=owner_id,
         )
         self._sessions[session_id] = session
@@ -102,7 +102,7 @@ class InMemorySessionRepository(SessionRepository):
             session_id=session_id,
             sender=sender,
             content=content,
-            timestamp=timestamp or datetime.utcnow(),
+            timestamp=timestamp or datetime.now(timezone.utc),
             agent=agent,
         )
         session.messages.append(message)
@@ -130,7 +130,7 @@ class FileSessionRepository(SessionRepository):
         session = Session(
             id=session_id,
             title=initial_title,
-            created_at=datetime.utcnow(),
+            created_at=datetime.now(timezone.utc),
             owner_id=owner_id,
             messages=[],
         )
@@ -194,7 +194,7 @@ class FileSessionRepository(SessionRepository):
                 session_id=session_id,
                 sender=sender,
                 content=content,
-                timestamp=timestamp or datetime.utcnow(),
+                timestamp=timestamp or datetime.now(timezone.utc),
                 agent=agent,
             )
             session.messages.append(message)

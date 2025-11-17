@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
 
@@ -92,7 +92,7 @@ class BaseAgent:
                 )
             full_text = ''.join(chunks)
             final_text = final_transform(full_text) if final_transform else full_text
-            final_timestamp = datetime.utcnow().isoformat()
+            final_timestamp = datetime.now(timezone.utc).isoformat()
             await publish_token(
                 sender=sender,
                 agent=self.name,
@@ -125,7 +125,7 @@ class BaseAgent:
             message_id=message_id,
             final=True,
             persist_final=True,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
         )
         return AgentRunResult(agent=self.name, sender=sender, content=content, message_id=message_id)
 

@@ -53,6 +53,20 @@ export function useWorkspace(): UseWorkspaceResult {
 
   const isHomeView = !sessionId && messages.length === 0; // 判断是否显示首页视图
 
+  const ensureIsoTimestamp = (input?: string): string => {
+    if (!input) return new Date().toISOString();
+    const normalized = input.trim();
+    if (/([zZ]|[+-]\d{2}:\d{2})$/.test(normalized)) {
+      return normalized;
+    }
+    return `${normalized}Z`;
+  };
+
+  const normalizeMessage = (message: Message): Message => ({
+    ...message,
+    timestamp: ensureIsoTimestamp(message.timestamp)
+  });
+
   // 加载当前用户的全部会话，并在无 token 时清空本地缓存
   const loadSessions = useCallback(async () => {
     if (!token) {
@@ -85,9 +99,10 @@ export function useWorkspace(): UseWorkspaceResult {
   // 将新消息合并进本地消息列表（基于 id upsert，确保去重）
   const mergeMessages = useCallback((incoming: Message | Message[]) => {
     const items = Array.isArray(incoming) ? incoming : [incoming];
+    const normalizedItems = items.map(normalizeMessage);
     setMessages((prev) => {
       const next = [...prev];
-      for (const item of items) {
+      for (const item of normalizedItems) {
         const index = next.findIndex((message) => message.id === item.id);
         if (index >= 0) {
           next[index] = item;
@@ -129,20 +144,20 @@ export function useWorkspace(): UseWorkspaceResult {
         mergeMessages(optimisticMessage);
         // 向后端提交真实请求，并用真实回合替换掉乐观消息
         const turn = await sendMessage(token, activeSessionId, content);
-        setMessages((prev) => {
-          const next = prev.filter((message) => message.id !== optimisticId);
-          const upsert = (item: Message) => {
-            const index = next.findIndex((message) => message.id === item.id);
-            if (index >= 0) {
-              next[index] = item;
-            } else {
-              next.push(item);
-            }
-          };
-          upsert(turn.user);
-          turn.responses.forEach(upsert);
-          return next;
-        });
+        // setMessages((prev) => {
+        //   const next = prev.filter((message) => message.id !== optimisticId);
+        //   const upsert = (item: Message) => {
+        //     const index = next.findIndex((message) => message.id === item.id);
+        //     if (index >= 0) {
+        //       next[index] = item;
+        //     } else {
+        //       next.push(item);
+        //     }
+        //   };
+        //   upsert(turn.user);
+        //   turn.responses.forEach(upsert);
+        //   return next;
+        // });
         await loadSessions();
       } catch (err) {
         if (optimisticId) {

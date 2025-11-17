@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, Iterable, Optional
 from uuid import uuid4
 
@@ -33,7 +33,7 @@ def _ensure_timestamp(timestamp: Optional[str]) -> str:
             return timestamp
         except ValueError:
             pass
-    return datetime.utcnow().isoformat()
+    return datetime.now(timezone.utc).isoformat()
 
 
 async def publish_event(event: EventPayload, publisher: Optional[StreamPublisher] = None) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 from uuid import uuid4
 
@@ -126,7 +126,7 @@ class SequentialWorkflow(AgentWorkflow):
             content=content,
             agent='Mike',
             message_id=message_id,
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
     def _extract_agent_hint(self, text: str, candidates: list[AgentRole]) -> Optional[AgentRole]:

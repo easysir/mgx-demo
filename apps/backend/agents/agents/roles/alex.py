@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List
 
 from ..base import AgentContext, AgentRunResult, BaseAgent
@@ -88,7 +88,7 @@ class AlexAgent(BaseAgent):
                             content=preview,
                             agent=self.name,
                             message_id=status_id,
-                            timestamp=datetime.utcnow().isoformat(),
+                            timestamp=datetime.now(timezone.utc).isoformat(),
                         )
                     except ToolExecutionError as exc:
                         error_line = f"{spec['command']} (失败: {exc})"
@@ -98,7 +98,7 @@ class AlexAgent(BaseAgent):
                             content=error_line,
                             agent=self.name,
                             message_id=status_id,
-                            timestamp=datetime.utcnow().isoformat(),
+                            timestamp=datetime.now(timezone.utc).isoformat(),
                         )
             if applied:
                 summary += '\n\n[文件写入]\n' + '\n'.join(f"- {path}" for path in applied)
@@ -111,7 +111,7 @@ class AlexAgent(BaseAgent):
                 message_id=message_id,
                 final=True,
                 persist_final=True,
-                timestamp=datetime.utcnow().isoformat(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
             )
             return AgentRunResult(agent=self.name, sender='agent', content=summary, message_id=message_id)
         except LLMProviderError as exc:
@@ -119,5 +119,6 @@ class AlexAgent(BaseAgent):
                 content=str(exc),
                 agent=self.name,
                 message_id=message_id,
+                timestamp=datetime.now(timezone.utc).isoformat(),
             )
             raise

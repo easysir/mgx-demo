@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable, Dict, List, Optional, TYPE_CHECKING
 
 from shared.types import AgentRole, SenderRole
@@ -77,4 +77,4 @@ def _parse_timestamp(value: Optional[str]) -> datetime:
             return datetime.fromisoformat(value)
         except ValueError:
             pass
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)
