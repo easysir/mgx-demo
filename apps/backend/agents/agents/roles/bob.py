@@ -3,11 +3,12 @@ from __future__ import annotations
 import re
 from typing import Any, Dict, List
 
-from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
+from ..base import AgentContext, AgentRunResult, BaseAgent
 from ..prompts import BOB_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 from ...llm import LLMProviderError
 from ...utils import extract_file_blocks
+from ...stream import publish_error, publish_token
 
 
 class BobAgent(BaseAgent):
@@ -19,26 +20,20 @@ class BobAgent(BaseAgent):
     async def plan(self, context: AgentContext) -> str:
         return 'Bob 正在评估架构与技术栈。'
 
-    async def act(
-        self, context: AgentContext, stream_publisher: StreamPublisher | None = None
-    ) -> AgentRunResult:
+    async def act(self, context: AgentContext) -> AgentRunResult:
         prompt = BOB_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         message_id = self._new_message_id()
         chunks: list[str] = []
         try:
             async for chunk in self._llm.stream_generate(prompt=prompt, provider='deepseek'):
                 chunks.append(chunk)
-                if stream_publisher:
-                    await stream_publisher(
-                        {
-                            'type': 'token',
-                            'sender': 'agent',
-                            'agent': self.name,
-                            'content': chunk,
-                            'message_id': message_id,
-                            'final': False,
-                        }
-                    )
+                await publish_token(
+                    sender='agent',
+                    agent=self.name,
+                    content=chunk,
+                    message_id=message_id,
+                    final=False,
+                )
             raw = ''.join(chunks)
             reference_blocks = self._extract_read_blocks(raw)
             history_paths = self._discover_shared_paths(context)
@@ -69,30 +64,20 @@ class BobAgent(BaseAgent):
                         applied.append(f"{spec['path']} (失败: {exc})")
             if applied:
                 summary += '\n\n[架构文档写入]\n' + '\n'.join(f"- {path}" for path in applied)
-            if stream_publisher:
-                await stream_publisher(
-                    {
-                        'type': 'token',
-                        'sender': 'agent',
-                        'agent': self.name,
-                        'content': summary,
-                        'message_id': message_id,
-                        'final': True,
-                    }
-                )
+            await publish_token(
+                sender='agent',
+                agent=self.name,
+                content=summary,
+                message_id=message_id,
+                final=True,
+            )
             return AgentRunResult(agent=self.name, sender='agent', content=summary, message_id=message_id)
         except LLMProviderError as exc:
-            if stream_publisher:
-                await stream_publisher(
-                    {
-                        'type': 'error',
-                        'sender': 'status',
-                        'agent': self.name,
-                        'content': str(exc),
-                        'message_id': message_id,
-                        'final': True,
-                    }
-                )
+            await publish_error(
+                content=str(exc),
+                agent=self.name,
+                message_id=message_id,
+            )
             raise
 
     def _extract_read_blocks(self, text: str) -> List[str]:

@@ -6,15 +6,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 from uuid import uuid4
 
 from shared.types import AgentRole, SenderRole
 
 from ..llm import LLMProviderError, get_llm_service
 from ..tools import ToolExecutor
-
-StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]
+from ..stream import publish_error, publish_token
 
 
 @dataclass(frozen=True)
@@ -59,9 +58,7 @@ class BaseAgent:
         """Optional planning step before执行工具。"""
         raise NotImplementedError
 
-    async def act(
-        self, context: AgentContext, stream_publisher: Optional[StreamPublisher] = None
-    ) -> AgentRunResult:
+    async def act(self, context: AgentContext) -> AgentRunResult:
         """Execute核心逻辑，例如调用LLM或工具。"""
         raise NotImplementedError
 
@@ -76,7 +73,6 @@ class BaseAgent:
         prompt: str,
         provider: str,
         sender: SenderRole,
-        stream_publisher: Optional[StreamPublisher],
         final_transform: Optional[Callable[[str], str]] = None,
     ) -> AgentRunResult:
         """统一的 LLM 流式封装，方便各角色直接调用。"""
@@ -86,43 +82,29 @@ class BaseAgent:
         try:
             async for chunk in self._llm.stream_generate(prompt=prompt, provider=provider):
                 chunks.append(chunk)
-                if stream_publisher:
-                    await stream_publisher(
-                        {
-                            'type': 'token',
-                            'sender': sender,
-                            'agent': self.name,
-                            'content': chunk,
-                            'message_id': message_id,
-                            'final': False,
-                        }
-                    )
+                await publish_token(
+                    sender=sender,
+                    agent=self.name,
+                    content=chunk,
+                    message_id=message_id,
+                    final=False,
+                )
             full_text = ''.join(chunks)
             final_text = final_transform(full_text) if final_transform else full_text
-            if stream_publisher:
-                await stream_publisher(
-                    {
-                        'type': 'token',
-                        'sender': sender,
-                        'agent': self.name,
-                        'content': final_text,
-                        'message_id': message_id,
-                        'final': True,
-                    }
-                )
+            await publish_token(
+                sender=sender,
+                agent=self.name,
+                content=final_text,
+                message_id=message_id,
+                final=True,
+            )
             return AgentRunResult(agent=self.name, sender=sender, content=final_text, message_id=message_id)
         except LLMProviderError as exc:
-            if stream_publisher:
-                await stream_publisher(
-                    {
-                        'type': 'error',
-                        'sender': 'status',
-                        'agent': self.name,
-                        'content': str(exc),
-                        'message_id': message_id,
-                        'final': True,
-                    }
-                )
+            await publish_error(
+                content=str(exc),
+                agent=self.name,
+                message_id=message_id,
+            )
             raise
 
     async def _emit_final_message(
@@ -130,19 +112,14 @@ class BaseAgent:
         *,
         content: str,
         sender: SenderRole,
-        stream_publisher: Optional[StreamPublisher],
     ) -> AgentRunResult:
         message_id = self._new_message_id()
-        if stream_publisher:
-            await stream_publisher(
-                {
-                    'type': 'token',
-                    'sender': sender,
-                    'agent': self.name,
-                    'content': content,
-                    'message_id': message_id,
-                    'final': True,
-                }
+        await publish_token(
+            sender=sender,
+            agent=self.name,
+            content=content,
+            message_id=message_id,
+            final=True,
         )
         return AgentRunResult(agent=self.name, sender=sender, content=content, message_id=message_id)
 

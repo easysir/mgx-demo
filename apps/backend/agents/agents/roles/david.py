@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
+from ..base import AgentContext, AgentRunResult, BaseAgent
 from ..prompts import DAVID_SYSTEM_PROMPT
 
 
@@ -13,14 +13,11 @@ class DavidAgent(BaseAgent):
     async def plan(self, context: AgentContext) -> str:
         return 'David 正在收集数据需求并设计可视化。'
 
-    async def act(
-        self, context: AgentContext, stream_publisher: StreamPublisher | None = None
-    ) -> AgentRunResult:
+    async def act(self, context: AgentContext) -> AgentRunResult:
         prompt = DAVID_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         return await self._stream_llm_response(
             context=context,
             prompt=prompt,
             provider='deepseek',
             sender='agent',
-            stream_publisher=stream_publisher,
         )

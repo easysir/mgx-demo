@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from app.services.stream import stream_manager
+from agents.stream import file_change_event
 
 
 class SandboxFileWatcherManager:
@@ -45,10 +46,7 @@ class SandboxFileWatcherManager:
               if changed:
                   await stream_manager.broadcast(
                       session_id,
-                      {
-                          "type": "file_change",
-                          "paths": changed,
-                      },
+                      file_change_event(changed),
                   )
               previous = current
       except asyncio.CancelledError:

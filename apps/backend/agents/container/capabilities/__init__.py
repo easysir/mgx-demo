@@ -15,6 +15,7 @@ from agents.tools import (
 from ..services.container import container_manager
 from ..services.filesystem import FileService, FileAccessError, file_service
 from ..services.sandbox_exec import SandboxCommandService, sandbox_command_service
+from ...stream import file_change_event
 
 FileChangeHook = Callable[[str, Dict[str, Any]], Awaitable[None]]
 
@@ -58,10 +59,7 @@ class SandboxFileCapability(SandboxFileAdapter):
         if self._hook:
             await self._hook(
                 session_id,
-                {
-                    'type': 'file_change',
-                    'paths': [payload['path']],
-                },
+                file_change_event([payload['path']]),
             )
         return {
             'path': payload['path'],

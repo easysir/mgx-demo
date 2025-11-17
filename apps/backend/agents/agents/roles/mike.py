@@ -4,7 +4,7 @@ import json
 import re
 from typing import Any, Dict, Optional, Tuple
 
-from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
+from ..base import AgentContext, AgentRunResult, BaseAgent
 from ..prompts import MIKE_PLAN_PROMPT, MIKE_REVIEW_PROMPT, MIKE_SUMMARY_PROMPT, MIKE_SYSTEM_PROMPT
 
 
@@ -17,23 +17,19 @@ class MikeAgent(BaseAgent):
     async def plan(self, context: AgentContext) -> str:
         return f'Mike 正在审阅需求“{context.user_message}”，准备拆解任务。'
 
-    async def act(
-        self, context: AgentContext, stream_publisher: StreamPublisher | None = None
-    ) -> AgentRunResult:
+    async def act(self, context: AgentContext) -> AgentRunResult:
         prompt = MIKE_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         return await self._stream_llm_response(
             context=context,
             prompt=prompt,
             provider='deepseek',
             sender='mike',
-            stream_publisher=stream_publisher,
         )
 
     async def plan_next_agent(
         self,
         context: AgentContext,
         available_agents: list[str],
-        stream_publisher: StreamPublisher | None = None,
     ) -> AgentRunResult:
         if available_agents:
             available_text = '\n'.join(f"- {entry}" for entry in available_agents)
@@ -48,7 +44,6 @@ class MikeAgent(BaseAgent):
             prompt=prompt,
             provider='deepseek',
             sender='mike',
-            stream_publisher=stream_publisher,
             final_transform=self._format_plan_response,
         )
 
@@ -58,7 +53,6 @@ class MikeAgent(BaseAgent):
         agent_name: str,
         agent_output: str,
         remaining_agents: list[str],
-        stream_publisher: StreamPublisher | None = None,
     ) -> AgentRunResult:
         prompt = MIKE_REVIEW_PROMPT.format(agent_name=agent_name, agent_output=agent_output)
         if not remaining_agents:
@@ -68,7 +62,6 @@ class MikeAgent(BaseAgent):
             prompt=prompt,
             provider='deepseek',
             sender='mike',
-            stream_publisher=stream_publisher,
             final_transform=lambda text: self._format_review_response(text, agent_name),
         )
 
@@ -76,7 +69,6 @@ class MikeAgent(BaseAgent):
         self,
         context: AgentContext,
         contributions: list[Tuple[str, str]],
-        stream_publisher: StreamPublisher | None = None,
     ) -> AgentRunResult:
         contributions_text = self._render_contributions(contributions)
         prompt = MIKE_SUMMARY_PROMPT.format(
@@ -88,7 +80,6 @@ class MikeAgent(BaseAgent):
             prompt=prompt,
             provider='deepseek',
             sender='mike',
-            stream_publisher=stream_publisher,
             final_transform=lambda text: self._format_summary_response(text, context.user_message),
         )
 

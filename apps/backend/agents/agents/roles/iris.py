@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..base import AgentContext, AgentRunResult, BaseAgent, StreamPublisher
+from ..base import AgentContext, AgentRunResult, BaseAgent
 from ..prompts import IRIS_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 
@@ -14,9 +14,7 @@ class IrisAgent(BaseAgent):
     async def plan(self, context: AgentContext) -> str:
         return 'Iris 正在搜索资料与外部参考。'
 
-    async def act(
-        self, context: AgentContext, stream_publisher: StreamPublisher | None = None
-    ) -> AgentRunResult:
+    async def act(self, context: AgentContext) -> AgentRunResult:
         research_snippets = await self._collect_external_insights(context)
         prompt = IRIS_SYSTEM_PROMPT.format(
             user_message=self._compose_user_message(context),
@@ -27,7 +25,6 @@ class IrisAgent(BaseAgent):
             prompt=prompt,
             provider='deepseek',
             sender='agent',
-            stream_publisher=stream_publisher,
         )
 
     async def _collect_external_insights(self, context: AgentContext) -> str:

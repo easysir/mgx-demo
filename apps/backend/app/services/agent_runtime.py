@@ -5,15 +5,16 @@ from __future__ import annotations
 import json
 import logging
 from datetime import timezone
-from typing import Any, Awaitable, Callable, Dict, List, get_args
+from typing import Any, Awaitable, Callable, Dict, List, Optional, get_args
 
 from agents import get_agent_orchestrator
 from agents.tools import ToolExecutor
 from agents.tools.registry import get_tool_executor, register_event_hook
 from agents.container.capabilities import sandbox_file_capability
 from agents.context import register_session_store
+from agents.stream import file_change_event, tool_call_event
 from app.models import Message
-from shared.types import AgentRole
+from shared.types import AgentRole, SenderRole
 
 from .session_repository import SessionRepository, session_repository
 from .stream import stream_manager
@@ -41,6 +42,7 @@ class AgentRuntimeGateway:
         # 为该 session 生成 WebSocket 推送器，编排器在生成 token/status 时复用
         stream_publisher = self._build_stream_publisher(session_id)
         # 交给 orchestrator 运行 Mike 状态机，拿到各 Agent 的 dispatch 结果
+        persist_fn = self._build_persist_fn(session_id, owner_id)
         dispatches = await self._orchestrator.handle_user_turn(
             session_id=session_id,
             owner_id=owner_id,
@@ -48,19 +50,9 @@ class AgentRuntimeGateway:
             user_message=user_message,
             tools=self._tool_executor,
             stream_publisher=stream_publisher,
+            persist_fn=persist_fn,
         )
-        # 将所有 Agent 输出回写 SessionStore，确保 REST 与回放一致
-        return [
-            self._store.append_message(
-                session_id=session_id,
-                sender=dispatch.sender,
-                agent=dispatch.agent,
-                content=dispatch.content,
-                owner_id=owner_id,
-                message_id=dispatch.message_id,
-            )
-            for dispatch in dispatches
-        ]
+        return dispatches
 
     async def execute_tool(
         self,
@@ -85,6 +77,26 @@ class AgentRuntimeGateway:
 
         return publish
 
+    def _build_persist_fn(
+        self, session_id: str, owner_id: str
+    ) -> Callable[[SenderRole, Optional[AgentRole], str, Optional[str]], Message]:
+        def persist(
+            sender: SenderRole,
+            agent: Optional[AgentRole],
+            content: str,
+            message_id: Optional[str],
+        ) -> Message:
+            return self._store.append_message(
+                session_id=session_id,
+                sender=sender,
+                agent=agent,
+                content=content,
+                owner_id=owner_id,
+                message_id=message_id,
+            )
+
+        return persist
+
     async def _handle_tool_call_event(self, tool_name: str, params: Dict[str, Any]) -> None:
         session_id = params.get('session_id')
         owner_id = params.get('owner_id')
@@ -102,17 +114,14 @@ class AgentRuntimeGateway:
             content=content,
             owner_id=owner_id,
         )
-        event_payload = {
-            'type': 'tool_call',
-            'sender': 'agent',
-            'agent': agent_name,
-            'invoker': invoker,
-            'tool': tool_name,
-            'content': content,
-            'message_id': message.id,
-            'final': True,
-            'timestamp': message.timestamp.replace(tzinfo=timezone.utc).isoformat(),
-        }
+        event_payload = tool_call_event(
+            tool=tool_name,
+            content=content,
+            invoker=invoker,
+            agent=agent_name,
+            message_id=message.id,
+            timestamp=message.timestamp.replace(tzinfo=timezone.utc).isoformat(),
+        )
         try:
             await stream_manager.broadcast(session_id, event_payload)
         except Exception as exc:  # pragma: no cover - defensive
