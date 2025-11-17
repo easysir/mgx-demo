@@ -49,9 +49,11 @@ class AgentExecutor:
         *,
         registry: AgentRegistry,
         workflow: AgentWorkflow,
+        tool_executor: ToolExecutor,
     ) -> None:
         self._registry = registry
         self._workflow = workflow
+        self._tool_executor = tool_executor
 
     async def handle_user_turn(
         self,
@@ -60,7 +62,6 @@ class AgentExecutor:
         owner_id: str,
         user_id: str,
         user_message: str,
-        tools: Optional[ToolExecutor],
         stream_publisher: Optional[StreamPublisher] = None,
         persist_fn: Callable[[SenderRole, Optional[AgentRole], str, Optional[str], Optional[datetime]], 'Message'],
     ) -> list['Message']:
@@ -71,7 +72,7 @@ class AgentExecutor:
             owner_id=owner_id,
             user_id=user_id,
             user_message=user_message,
-            tools=tools,
+            tools=self._tool_executor,
             history=payload.get('history'),
             metadata=payload.get('metadata'),
         )

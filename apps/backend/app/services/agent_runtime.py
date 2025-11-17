@@ -9,10 +9,10 @@ from typing import Any, Awaitable, Callable, Dict, List, Optional, get_args
 
 from agents import get_agent_orchestrator
 from agents.tools import ToolExecutor
-from agents.tools.registry import get_tool_executor, register_event_hook
+from agents.tools.registry import get_tool_executor
 from agents.container.capabilities import sandbox_file_capability
 from agents.context import register_session_store
-from agents.stream import file_change_event, tool_call_event
+from agents.stream import file_change_event
 from app.models import Message
 from shared.types import AgentRole, SenderRole
 
@@ -20,17 +20,15 @@ from .session_repository import SessionRepository, session_repository
 from .stream import stream_manager
 
 logger = logging.getLogger(__name__)
-AGENT_NAME_SET = set(get_args(AgentRole))
 
 
 class AgentRuntimeGateway:
     """Thin wrapper so FastAPI endpoints remain LLM/tool agnostic."""
 
     def __init__(self, store: SessionRepository, tools: ToolExecutor | None = None) -> None:
-        # Session 仓库用于持久化消息，工具执行器负责给 Agent 暴露文件等能力
+        # Session 仓库用于持久化消息
         self._store = store
-        self._tool_executor = tools or get_tool_executor()
-        register_event_hook(self._handle_tool_call_event)
+        self._tool_executor = tools  # 仅供 debug/直连工具接口使用
         sandbox_file_capability.set_file_change_hook(self._handle_file_change_event)
         register_session_store(self._store)
         self._orchestrator = get_agent_orchestrator()
@@ -48,7 +46,6 @@ class AgentRuntimeGateway:
             owner_id=owner_id,
             user_id=user_id,
             user_message=user_message,
-            tools=self._tool_executor,
             stream_publisher=stream_publisher,
             persist_fn=persist_fn,
         )
@@ -68,7 +65,8 @@ class AgentRuntimeGateway:
         if extra_params:
             payload.update(extra_params)
         payload.setdefault('agent', (extra_params or {}).get('agent', 'external'))
-        return await self._tool_executor.run(tool_name, params=payload)
+        executor = self._tool_executor or get_tool_executor()
+        return await executor.run(tool_name, params=payload)
 
     def _build_stream_publisher(self, session_id: str) -> Callable[[Dict[str, Any]], Awaitable[None]]:
         # 返回闭包，供 orchestrator 在任意节点向该 session 推送事件
@@ -98,36 +96,6 @@ class AgentRuntimeGateway:
             )
 
         return persist
-
-    async def _handle_tool_call_event(self, tool_name: str, params: Dict[str, Any]) -> None:
-        session_id = params.get('session_id')
-        owner_id = params.get('owner_id')
-        if not session_id or not owner_id:
-            logger.debug('忽略缺少 session/owner 的工具调用记录: %s', tool_name)
-            return
-        raw_agent = params.get('agent')
-        agent_name = raw_agent if isinstance(raw_agent, str) and raw_agent in AGENT_NAME_SET else None
-        invoker = raw_agent or agent_name or 'tool'
-        content = f"[工具调用] {tool_name}"
-        message = self._store.append_message(
-            session_id=session_id,
-            sender='agent',
-            agent=agent_name,
-            content=content,
-            owner_id=owner_id,
-        )
-        event_payload = tool_call_event(
-            tool=tool_name,
-            content=content,
-            invoker=invoker,
-            agent=agent_name,
-            message_id=message.id,
-            timestamp=message.timestamp.replace(tzinfo=timezone.utc).isoformat(),
-        )
-        try:
-            await stream_manager.broadcast(session_id, event_payload)
-        except Exception as exc:  # pragma: no cover - defensive
-            logger.warning('Failed to broadcast tool event for %s: %s', session_id, exc)
 
     async def _handle_file_change_event(self, session_id: str, payload: Dict[str, Any]) -> None:
         try:

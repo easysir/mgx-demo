@@ -9,6 +9,7 @@ from agents.container.capabilities import (
     sandbox_file_capability,
     sandbox_command_capability,
 )
+from .events import stream_tool_call_event
 
 ToolEventHook = Callable[[str, Dict[str, Any]], Awaitable[None]]
 
@@ -28,6 +29,7 @@ def _build_default_executor() -> ToolExecutor:
     )
     executor = build_tool_executor(adapters)
     executor.set_event_hook(_dispatch_event)
+    register_event_hook(stream_tool_call_event)
     return executor
 
 
