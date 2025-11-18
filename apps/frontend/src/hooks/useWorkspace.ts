@@ -1,10 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 
 import {
-  API_BASE,
   createSession,
   deleteSession,
   fetchMessages,
@@ -12,7 +11,8 @@ import {
   sendMessage,
 } from "@/lib/api/chat";
 import { useAuth } from "@/hooks/useAuth";
-import type { Message, SenderRole, Session, StreamEvent } from "@/types/chat";
+import { useSessionStream } from "@/hooks/useSessionStream";
+import type { Message, Session } from "@/types/chat";
 
 interface UseWorkspaceResult {
   user: ReturnType<typeof useAuth>["user"];
@@ -46,10 +46,6 @@ export function useWorkspace(): UseWorkspaceResult {
   const [isSending, setIsSending] = useState(false); // 是否正在发送消息或加载会话
   const [isLoadingSessions, setIsLoadingSessions] = useState(false); // 会话列表是否处于加载中
   const [error, setError] = useState<string | null>(null); // 全局错误提示
-  const [streamingMessages, setStreamingMessages] = useState<
-    Record<string, Message>
-  >({}); // 尚未完成的流式消息缓存
-  const [fileVersion, setFileVersion] = useState(0); // 文件/上下文版本号，用于触发刷新
 
   const isHomeView = !sessionId && messages.length === 0; // 判断是否显示首页视图
 
@@ -64,7 +60,7 @@ export function useWorkspace(): UseWorkspaceResult {
 
   const normalizeMessage = (message: Message): Message => ({
     ...message,
-    timestamp: ensureIsoTimestamp(message.timestamp)
+    timestamp: ensureIsoTimestamp(message.timestamp),
   });
 
   // 加载当前用户的全部会话，并在无 token 时清空本地缓存
@@ -114,15 +110,25 @@ export function useWorkspace(): UseWorkspaceResult {
     });
   }, []);
 
+  const { streamingMessages, resetStreamingMessages, fileVersion } =
+    useSessionStream({
+      sessionId,
+      mergeMessages,
+      setError,
+      setIsSending,
+    });
+
   // 发送用户输入：必要时创建新会话，添加乐观消息，再落地真实响应
   const handleSend = useCallback(
     async (content: string) => {
+      // 拦截跳转登录页
       if (!user || !token) {
         router.push("/login");
         return;
       }
       setIsSending(true);
       setError(null);
+      // 用户消息乐观插入
       let optimisticId: string | null = null;
       try {
         let activeSessionId = sessionId;
@@ -132,6 +138,8 @@ export function useWorkspace(): UseWorkspaceResult {
           activeSessionId = session.id;
           setSessionId(session.id);
         }
+
+        console.log("What is sessionid??", sessionId);
         optimisticId = `pending-${Date.now()}`;
         const optimisticMessage: Message = {
           id: optimisticId,
@@ -198,14 +206,14 @@ export function useWorkspace(): UseWorkspaceResult {
         const history = await fetchMessages(token, id);
         setSessionId(id);
         setMessages(history);
-        setStreamingMessages({});
+        resetStreamingMessages();
       } catch (err) {
         setError(err instanceof Error ? err.message : "加载会话失败");
       } finally {
         setIsSending(false);
       }
     },
-    [token, router]
+    [token, router, resetStreamingMessages]
   );
 
   // 删除指定会话，必要时清空当前工作区
@@ -225,176 +233,23 @@ export function useWorkspace(): UseWorkspaceResult {
         if (sessionId === id) {
           setSessionId(undefined);
           setMessages([]);
-          setStreamingMessages({});
+          resetStreamingMessages();
         }
         await loadSessions();
       } catch (err) {
         setError(err instanceof Error ? err.message : "删除会话失败");
       }
     },
-    [token, router, sessionId, loadSessions]
+    [token, router, sessionId, loadSessions, resetStreamingMessages]
   );
 
   // 回到首页：清除选中的会话与临时流式数据
   const handleBackHome = useCallback(() => {
     setSessionId(undefined);
     setMessages([]);
-    setStreamingMessages({});
+    resetStreamingMessages();
     loadSessions();
-  }, [loadSessions]);
-
-  // 建立 WebSocket 监听当前会话的流式事件（工具调用、状态、消息等）
-  useEffect(() => {
-    if (!sessionId) {
-      setStreamingMessages({});
-      return;
-    }
-    const activeSessionId = sessionId;
-    let socket: WebSocket | null = null;
-    let cancelled = false;
-
-    // 允许通过环境变量或 API_BASE 推导出 WS 地址
-    const resolveWsBase = () => {
-      const configured = process.env.NEXT_PUBLIC_WS_BASE_URL;
-      if (configured) return configured.replace(/\/$/, "");
-      try {
-        const apiUrl = new URL(API_BASE);
-        const protocol = apiUrl.protocol === "https:" ? "wss:" : "ws:";
-        return `${protocol}//${apiUrl.host}`;
-      } catch {
-        if (typeof window !== "undefined") {
-          return window.location.origin.replace(/^http/, "ws");
-        }
-        return "ws://127.0.0.1:8000";
-      }
-    };
-
-    const wsBase = resolveWsBase();
-    const url = `${wsBase}/api/ws/sessions/${activeSessionId}`;
-    try {
-      socket = new WebSocket(url);
-    } catch (err) {
-      console.error("WebSocket connection failed", err);
-      return;
-    }
-
-    // 处理服务端推送的各种流式事件
-    socket.onmessage = (event) => {
-      if (cancelled) return;
-      try {
-        const data = JSON.parse(event.data) as StreamEvent;
-        const effectiveSession = data.session_id ?? activeSessionId;
-        if (!effectiveSession || effectiveSession !== activeSessionId) return;
-
-        // 刷新文件列表
-        if (data.type === "file_change") {
-          setFileVersion((prev) => prev + 1);
-          return;
-        }
-
-        const messageId = data.message_id ?? "";
-        if (!messageId) return;
-        const stableMessageId: string = messageId;
-
-        if (data.type === "tool_call") {
-          // 工具调用：直接落地为一条普通消息
-          const eventTimestamp = data.timestamp
-            ? new Date(data.timestamp).toISOString()
-            : new Date().toISOString();
-          const content = data.content ?? `[工具调用] ${data.tool ?? ""}`;
-          mergeMessages({
-            id: messageId,
-            session_id: activeSessionId,
-            sender: data.sender ?? "agent",
-            agent: data.agent ?? null,
-            content,
-            timestamp: eventTimestamp,
-          });
-          return;
-        }
-
-        if (data.type === "message" && data.sender === "user") {
-          return;
-        }
-
-        if (data.type === "error") {
-          // 错误事件需要在界面上展示并终止流式状态
-          const errorContent = data.content || "LLM 调用失败，请稍后重试";
-          setError(errorContent);
-          setIsSending(false);
-          setStreamingMessages({});
-          mergeMessages({
-            id: messageId,
-            session_id: activeSessionId,
-            sender: "status",
-            agent: data.agent ?? "Mike",
-            content: errorContent,
-            timestamp: new Date().toISOString(),
-          });
-          return;
-        }
-
-        // 将流式 token 累积到临时消息，final 后写回正式列表
-        setStreamingMessages((prev) => {
-          const previousEntry = prev[stableMessageId] as Message | undefined;
-          const inferredSender: SenderRole = data.sender ?? "agent";
-          const inferredTimestamp =
-            previousEntry?.timestamp ??
-            data.timestamp ??
-            new Date().toISOString();
-          const baseMessage: Message = previousEntry ?? {
-            id: stableMessageId,
-            session_id: activeSessionId,
-            sender: inferredSender,
-            agent: data.agent ?? null,
-            content: "",
-            timestamp: inferredTimestamp,
-          };
-
-          const updated: Message =
-            data.type === "status"
-              ? {
-                  ...baseMessage,
-                  sender: "status",
-                  agent: data.agent ?? "Mike",
-                  content: data.content ?? "",
-                }
-              : {
-                  ...baseMessage,
-                  content: baseMessage.content + (data.content ?? ""),
-                };
-
-          if (data.final) {
-            mergeMessages({
-              ...updated,
-              timestamp: baseMessage.timestamp,
-            });
-            const nextState = { ...prev };
-            delete nextState[stableMessageId];
-            return nextState;
-          }
-          return { ...prev, [stableMessageId]: updated };
-        });
-      } catch (err) {
-        console.error("Failed to parse stream event", err);
-      }
-    };
-
-    socket.onerror = (event) => {
-      console.error("WebSocket error", event);
-    };
-
-    return () => {
-      cancelled = true;
-      setStreamingMessages({});
-      socket?.close();
-    };
-  }, [sessionId, mergeMessages]);
-
-  const streamingMessagesList = useMemo(
-    () => Object.values(streamingMessages),
-    [streamingMessages]
-  );
+  }, [loadSessions, resetStreamingMessages]);
 
   return {
     user,
@@ -402,7 +257,7 @@ export function useWorkspace(): UseWorkspaceResult {
     sessionId,
     sessions,
     messages,
-    streamingMessages: streamingMessagesList,
+    streamingMessages,
     homeDraft,
     setHomeDraft,
     isSending,
