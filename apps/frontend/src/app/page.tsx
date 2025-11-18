@@ -34,9 +34,9 @@ export default function Home() {
     <main className={`workspace ${isHomeView ? 'workspace--home' : 'workspace--chat'}`}>
       <header className="workspace__nav">
         <div className="workspace__nav-left">
-          <button className="workspace__logo" onClick={handleBackHome}>
+          <div className="workspace__logo" onClick={handleBackHome}>
             MGX
-          </button>
+          </div>
         </div>
 
         <div className="workspace__nav-right">

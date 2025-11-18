@@ -25,15 +25,12 @@ export function SessionListPanel({ sessions, isLoading, isBusy, onOpen, onDelete
         ) : (
           <ul className="workspace__history-list">
             {sessions.map((session) => (
-              <li key={session.id}>
-                <div>
-                  <strong>{session.title}</strong>
+              <li key={session.id} onClick={() => onOpen(session.id)}>
+                <div className="workspace__history-list-description">
+                  <p>{session.title}</p>
                   <small>{new Date(session.created_at).toLocaleString()}</small>
                 </div>
                 <div className="workspace__history-actions">
-                  <button type="button" onClick={() => onOpen(session.id)} disabled={isBusy}>
-                    打开
-                  </button>
                   <button type="button" className="ghost" onClick={() => onDelete(session.id)} disabled={isBusy}>
                     删除
                   </button>
