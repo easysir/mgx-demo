@@ -14,7 +14,8 @@ from shared.types import AgentRole, SenderRole
 
 from ..config import AgentRegistry
 from ..tools import ToolExecutor
-from ..context import gather_context_payload
+from ..context import build_session_context
+from ..context.models import SessionContext
 from ..stream import StreamContext, push_stream_context, pop_stream_context
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -27,8 +28,7 @@ class WorkflowContext:
     user_message: str
     owner_id: str
     tools: Optional[ToolExecutor] = None
-    history: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
+    session_context: Optional[SessionContext] = None
 
 
 StreamPublisher = Callable[[Dict[str, Any]], Awaitable[None]]
@@ -64,17 +64,21 @@ class AgentExecutor:
         user_message: str,
         stream_publisher: Optional[StreamPublisher] = None,
         persist_fn: Callable[[SenderRole, Optional[AgentRole], str, Optional[str], Optional[datetime]], 'Message'],
-    ) -> list['Message']:
+        ) -> list['Message']:
         """Run the workflow for a user turn and return persisted messages."""
-        payload = gather_context_payload(session_id=session_id, owner_id=owner_id)
-        context = WorkflowContext(
+        session_context = build_session_context(
+            session_id=session_id,
+            owner_id=owner_id,
+            user_id=user_id,
+            user_message=user_message,
+        )
+        workflow_context = WorkflowContext(
             session_id=session_id,
             owner_id=owner_id,
             user_id=user_id,
             user_message=user_message,
             tools=self._tool_executor,
-            history=payload.get('history'),
-            metadata=payload.get('metadata'),
+            session_context=session_context,
         )
         stream_context = StreamContext(
             session_id=session_id,
@@ -84,7 +88,7 @@ class AgentExecutor:
         )
         token = push_stream_context(stream_context)
         try:
-            await self._workflow.generate(context, self._registry)
+            await self._workflow.generate(workflow_context, self._registry)
         finally:
             pop_stream_context(token)
         return stream_context.persisted_messages()

@@ -78,7 +78,7 @@ class FileService:
         session_id: str,
         owner_id: str,
         root: str = "",
-        depth: int = 2,
+        depth: int = 4,
         include_hidden: bool = False,
     ) -> list[dict]:
         """列出指定目录的文件树，受最大深度与条数限制。"""

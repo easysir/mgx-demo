@@ -16,7 +16,8 @@ async def send_message(payload: MessageCreate, user: UserProfile = Depends(get_c
     session = session_repository.get_session(payload.session_id, user.id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-
+    
+    # 每个会话对应一个 sessionId, 用户发送消息时，先把消息存储下来
     user_message = session_repository.append_message(
         session_id=payload.session_id,
         sender='user',

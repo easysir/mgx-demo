@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Dict, List, Protocol
 
 from shared.types import AgentRole
 from agents.container import file_service, FileAccessError
+from .models import SessionContext
+from .state import hydrate_session_context
 
+logger = logging.getLogger(__name__)
 
 class MessageRecord(Protocol):
     content: str
@@ -26,24 +30,64 @@ def register_session_store(store: SessionStore) -> None:
     _session_store = store
 
 
+def build_session_context(
+    *,
+    session_id: str,
+    owner_id: str,
+    user_id: str,
+    user_message: str,
+    history_limit: int = 8,
+    file_limit: int = 6,
+    artifact_limit: int = 5,
+) -> SessionContext:
+    history = _collect_history(session_id, owner_id, history_limit)  # 拉取最近的会话消息用作上下文
+    files = _collect_file_context(session_id, owner_id, file_limit)  # 同步沙箱内的文件片段
+    artifacts = _collect_recent_artifacts(session_id, owner_id, artifact_limit)  # 汇总任务产出的代码/结果
+    user_messages = _collect_user_messages(session_id, owner_id, history_limit)
+    trimmed_input = (user_message or '').strip()
+    if trimmed_input:
+        user_messages = (user_messages + [trimmed_input])[-history_limit:]
+    most_recent_user_message = trimmed_input or (user_messages[-1] if user_messages else '')
+    return hydrate_session_context(
+        session_id=session_id,
+        owner_id=owner_id,
+        user_id=user_id,
+        user_messages=user_messages,
+        most_recent_user_message=most_recent_user_message,
+        history=history,
+        artifacts=artifacts,
+        files_overview=files,
+    )
+
 def gather_context_payload(
     *,
     session_id: str,
     owner_id: str,
+    user_id: str = '',
+    user_message: str = '',
     history_limit: int = 8,
     file_limit: int = 6,
     artifact_limit: int = 5,
 ) -> Dict[str, str | Dict[str, str] | None]:
-    history = _collect_history(session_id, owner_id, history_limit)
-    files = _collect_file_context(session_id, owner_id, file_limit)
-    artifacts = _collect_recent_artifacts(session_id, owner_id, artifact_limit)
-    metadata: Dict[str, str] = {}
-    if files:
-        metadata['files_overview'] = files
-    if artifacts:
-        metadata['artifacts'] = artifacts
+    session_context = build_session_context(
+        session_id=session_id,
+        owner_id=owner_id,
+        user_id=user_id,
+        user_message=user_message,
+        history_limit=history_limit,
+        file_limit=file_limit,
+        artifact_limit=artifact_limit,
+    )
+    metadata = session_context.to_metadata_payload()
+    logger.info(
+        'Context payload assembled: history=%s files=%s artifacts=%s metadata=%s',
+        session_context.conversation_history,
+        session_context.files_overview,
+        session_context.artifacts,
+        metadata,
+    )
     return {
-        'history': history or None,
+        'history': session_context.conversation_history or None,
         'metadata': metadata or None,
     }
 
@@ -69,13 +113,33 @@ def _collect_history(session_id: str, owner_id: str, limit: int) -> str:
     return '\n'.join(lines)
 
 
+def _collect_user_messages(session_id: str, owner_id: str, limit: int) -> list[str]:
+    if not _session_store:
+        return []
+    try:
+        messages = _session_store.list_messages(session_id, owner_id)
+    except KeyError:
+        return []
+    user_lines: list[str] = []
+    for message in messages:
+        if getattr(message, 'sender', '') != 'user':
+            continue
+        content = (message.content or '').strip()
+        if not content:
+            continue
+        user_lines.append(content)
+    if limit and limit > 0:
+        user_lines = user_lines[-limit:]
+    return user_lines
+
+
 def _collect_file_context(session_id: str, owner_id: str, limit: int) -> str:
     try:
         entries = file_service.list_tree(
             session_id=session_id,
             owner_id=owner_id,
             root='',
-            depth=2,
+            depth=4,
             include_hidden=False,
         )
     except FileAccessError:
@@ -135,4 +199,4 @@ def _collect_recent_artifacts(session_id: str, owner_id: str, limit: int) -> str
     return '\n'.join(f"- {item}" for item in artifacts)
 
 
-__all__ = ['register_session_store', 'gather_context_payload']
+__all__ = ['register_session_store', 'gather_context_payload', 'build_session_context']

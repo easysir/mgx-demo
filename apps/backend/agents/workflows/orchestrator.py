@@ -20,6 +20,8 @@ from ..agents.roles.emma import EmmaAgent
 from ..agents.roles.iris import IrisAgent
 from ..agents.roles.mike import MikeAgent
 from ..stream import publish_status
+from ..context.models import ActionLogEntry, TodoEntry
+from ..context.state import record_action, add_todo
 
 AGENT_EXECUTION_ORDER: List[AgentRole] = ['Emma', 'Bob', 'Alex', 'David', 'Iris']
 FINISH_TOKENS = {'finish', '完成', '结束', 'done', 'complete'}
@@ -48,6 +50,7 @@ class SequentialWorkflow(AgentWorkflow):
         available_agents = [agent for agent in AGENT_EXECUTION_ORDER if registry.is_enabled(agent)]
         available_agents_descriptions = registry.describe_agents(available_agents)
         agent_context = self._build_agent_context(context)
+        mike_context = agent_context.for_agent('Mike')
         agent_contributions: list[Tuple[AgentRole, str]] = []
 
         await self._emit_status(
@@ -55,7 +58,7 @@ class SequentialWorkflow(AgentWorkflow):
             'Mike 正在评估任务，准备调度团队。',
         )
 
-        plan_result = await self._mike_agent.plan_next_agent(agent_context, available_agents_descriptions)
+        plan_result = await self._mike_agent.plan_next_agent(mike_context, available_agents_descriptions)
         next_agent = self._extract_agent_hint(plan_result.content, available_agents)
 
         iterations = 0
@@ -67,12 +70,30 @@ class SequentialWorkflow(AgentWorkflow):
                 f'Mike 将任务交给 {next_agent}。',
             )
 
-            agent_result = await self._run_agent(next_agent, agent_context)
+            agent_result = await self._run_agent(next_agent, agent_context.for_agent(next_agent))
             agent_contributions.append((next_agent, agent_result.content))
+            log_entry = ActionLogEntry(
+                agent=next_agent,
+                action='agent_execution',
+                result=agent_result.content[:400],
+                status='success',
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+            agent_context.action_log.append(log_entry)
+            record_action(context.session_id, log_entry)
+            for description in self._extract_todos(agent_result.content):
+                todo_entry = TodoEntry(
+                    description=description,
+                    owner=next_agent,
+                    priority='high',
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                agent_context.pending_todos.append(todo_entry)
+                add_todo(context.session_id, todo_entry)
 
             available_agents = [agent for agent in available_agents if agent != next_agent]
             review_result = await self._mike_agent.review_agent_output(
-                agent_context,
+                mike_context,
                 next_agent,
                 agent_result.content,
                 available_agents,
@@ -84,18 +105,27 @@ class SequentialWorkflow(AgentWorkflow):
             context.session_id,
             'Mike 收齐团队结果，准备向用户汇报结论与下一步。',
         )
-        await self._mike_agent.summarize_team(
-            agent_context,
-            agent_contributions,
-        )
+        await self._mike_agent.summarize_team(mike_context, agent_contributions)
         return None
 
     def _build_agent_context(self, context: WorkflowContext) -> AgentContext:
+        session_context = context.session_context
         metadata: Dict[str, Any] = {}
-        if context.history:
-            metadata['history'] = context.history
-        if context.metadata:
-            metadata.update(context.metadata)
+        history = ''
+        artifacts = ''
+        files_overview = ''
+        action_log = []
+        pending = []
+        agent_data: Dict[str, Any] = {}
+        agent_specific: Dict[AgentRole, Dict[str, Any]] = {}
+        if session_context:
+            metadata.update(session_context.to_metadata_payload())
+            history = session_context.conversation_history
+            artifacts = session_context.artifacts
+            files_overview = session_context.files_overview
+            action_log = session_context.action_log
+            pending = session_context.pending_todos
+            agent_specific = session_context.agent_specific
         return AgentContext(
             session_id=context.session_id,
             user_id=context.user_id,
@@ -103,6 +133,13 @@ class SequentialWorkflow(AgentWorkflow):
             user_message=context.user_message,
             metadata=metadata,
             tools=context.tools,
+            history=history,
+            artifacts=artifacts,
+            files_overview=files_overview,
+            action_log=action_log,
+            pending_todos=pending,
+            agent_data=agent_data,
+            agent_specific=agent_specific,
         )
 
     async def _run_agent(
@@ -173,3 +210,17 @@ class SequentialWorkflow(AgentWorkflow):
 
     def _new_message_id(self) -> str:
         return str(uuid4())
+
+    def _extract_todos(self, text: str) -> list[str]:
+        todos: list[str] = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            lowered = stripped.lower()
+            if lowered.startswith('todo:'):
+                todos.append(stripped[5:].strip())
+                continue
+            if stripped.startswith('- [ ]'):
+                todos.append(stripped.split(']', 1)[-1].strip())
+        return todos

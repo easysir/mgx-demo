@@ -44,6 +44,7 @@ class MikeAgent(BaseAgent):
             prompt=prompt,
             provider='deepseek',
             sender='mike',
+            interaction='plan_next_agent',
             final_transform=self._format_plan_response,
         )
 
@@ -62,6 +63,7 @@ class MikeAgent(BaseAgent):
             prompt=prompt,
             provider='deepseek',
             sender='mike',
+            interaction='review_agent_output',
             final_transform=lambda text: self._format_review_response(text, agent_name),
         )
 
@@ -80,6 +82,7 @@ class MikeAgent(BaseAgent):
             prompt=prompt,
             provider='deepseek',
             sender='mike',
+            interaction='summarize_team',
             final_transform=lambda text: self._format_summary_response(text, context.user_message),
         )
 

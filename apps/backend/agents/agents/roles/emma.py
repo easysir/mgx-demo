@@ -9,6 +9,7 @@ from ..prompts import EMMA_SYSTEM_PROMPT
 from ...tools import ToolExecutionError
 from ...llm import LLMProviderError
 from ...utils import extract_file_blocks
+from ...utils.llm_logger import record_llm_interaction
 from ...stream import publish_error, publish_token
 
 
@@ -67,6 +68,15 @@ class EmmaAgent(BaseAgent):
                         applied.append(f"{spec['path']} (失败: {exc})")
             if applied:
                 summary += '\n\n[PRD 写入]\n' + '\n'.join(f"- {path}" for path in applied)
+            await record_llm_interaction(
+                session_id=context.session_id,
+                agent=str(self.name),
+                prompt=prompt,
+                provider='deepseek',
+                raw_response=raw,
+                final_response=summary,
+                interaction='act',
+            )
             await publish_token(
                 sender='agent',
                 agent=self.name,
