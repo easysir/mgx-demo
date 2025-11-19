@@ -5,8 +5,10 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from uuid import uuid4
 
@@ -17,6 +19,8 @@ from ..tools import ToolExecutor
 from ..stream import publish_error, publish_token
 from ..context.models import ActionLogEntry, TodoEntry
 from ..utils.llm_logger import record_llm_interaction
+
+_CONTEXT_LOG_PATH = Path(__file__).resolve().parents[3] / 'data' / 'agent_context_logs.jsonl'
 
 
 @dataclass(frozen=True)
@@ -186,8 +190,9 @@ class BaseAgent:
         if history:
             sections.append(f"最近对话（供参考）:\n{history}")
         artifacts = context.artifacts or metadata.get('artifacts')
-        if artifacts:
-            sections.append(f"近期文件写入（供参考）:\n{artifacts}")
+        artifacts_summary = self._summarize_recent_writes(artifacts)
+        if artifacts_summary:
+            sections.append(f"近期文件写入（供参考）:\n{artifacts_summary}")
         files_overview = context.files_overview or metadata.get('files_overview') or metadata.get('files')
         if files_overview:
             sections.append(f"沙箱文件概览:\n{files_overview}")
@@ -208,3 +213,86 @@ class BaseAgent:
             sections.append(f"{self.name} 专属提示:\n{agent_lines}")
         sections.append(f"当前用户输入:\n{context.user_message}")
         return '\n\n'.join(sections)
+
+    def _format_context_for_log(self, context: AgentContext, *, stage: str, preview: int = 200) -> str:
+        # 生成结构化上下文快照，后续用于 JSONL 持久化与 debug
+        payload = {
+            'agent': str(self.name),
+            'stage': stage,
+            'session_id': context.session_id,
+            'owner_id': context.owner_id,
+            'user_id': context.user_id,
+            'user_message': context.user_message,
+            'history_preview': (context.history or '')[:preview],
+            'artifacts': context.artifacts,
+            'files_overview': context.files_overview,
+            'action_log_entries': len(context.action_log),
+            'pending_todos': self._summarize_todos_for_log(context.pending_todos),
+        }
+        self._persist_context_log(payload)
+        return json.dumps(payload, ensure_ascii=False)
+
+    def _persist_context_log(self, payload: Dict[str, Any]) -> None:
+        # 将上下文快照写入 data/agent_context_logs.jsonl（失败时忽略）
+        try:
+            _CONTEXT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with _CONTEXT_LOG_PATH.open('a', encoding='utf-8') as handle:
+                handle.write(json.dumps(payload, ensure_ascii=False) + '\n')
+        except Exception:
+            # Logging/persistence failure shouldn't break agent flow
+            pass
+
+    def _summarize_todos_for_log(self, todos: List[TodoEntry], *, limit: int = 5) -> Dict[str, Any]:
+        # 精简 TODO 列表：返回总数 + 去重后的少量高优条目
+        total = len(todos)
+        unique: list[str] = []
+        highlights: list[Dict[str, Any]] = []
+        for todo in todos:
+            desc = (todo.description or '').strip()
+            if not desc or desc in unique:
+                continue
+            unique.append(desc)
+            highlights.append(
+                {
+                    'description': desc,
+                    'priority': todo.priority,
+                    'status': todo.status,
+                }
+            )
+            if len(highlights) >= limit:
+                break
+        return {
+            'total': total,
+            'highlights': highlights,
+            'truncated': total > len(highlights),
+        }
+
+    def _summarize_recent_writes(self, artifacts_text: Optional[str], limit: int = 5) -> str:
+        if not artifacts_text:
+            return ''
+        summaries: list[str] = []
+        for line in artifacts_text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            stripped = stripped.lstrip('-').strip()
+            if not stripped:
+                continue
+            label = ''
+            path = stripped
+            if ': ' in stripped:
+                label, path = stripped.split(': ', 1)
+            label = label.strip()
+            path = path.strip()
+            if not path:
+                continue
+            filename = path.split('/')[-1] or path
+            summary = f"{filename}: {path}"
+            if label:
+                summary += f"（{label}）"
+            summaries.append(summary)
+            if len(summaries) >= limit:
+                break
+        if not summaries:
+            return ''
+        return '\n'.join(f"- {item}" for item in summaries)

@@ -23,6 +23,8 @@ class EmmaAgent(BaseAgent):
         return 'Emma 正在整理功能列表与验收标准。'
 
     async def act(self, context: AgentContext) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='act')
         research_snippets = await self._collect_research(context)
         prompt = EMMA_SYSTEM_PROMPT.format(
             user_message=self._compose_user_message(context),

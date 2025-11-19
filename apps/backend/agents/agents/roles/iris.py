@@ -15,6 +15,8 @@ class IrisAgent(BaseAgent):
         return 'Iris 正在搜索资料与外部参考。'
 
     async def act(self, context: AgentContext) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='act')
         research_snippets = await self._collect_external_insights(context)
         prompt = IRIS_SYSTEM_PROMPT.format(
             user_message=self._compose_user_message(context),

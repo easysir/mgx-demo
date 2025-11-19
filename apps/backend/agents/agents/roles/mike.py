@@ -18,6 +18,8 @@ class MikeAgent(BaseAgent):
         return f'Mike 正在审阅需求“{context.user_message}”，准备拆解任务。'
 
     async def act(self, context: AgentContext) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='act')
         prompt = MIKE_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         return await self._stream_llm_response(
             context=context,
@@ -31,6 +33,8 @@ class MikeAgent(BaseAgent):
         context: AgentContext,
         available_agents: list[str],
     ) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='plan_next_agent')
         if available_agents:
             available_text = '\n'.join(f"- {entry}" for entry in available_agents)
         else:
@@ -55,6 +59,8 @@ class MikeAgent(BaseAgent):
         agent_output: str,
         remaining_agents: list[str],
     ) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='review_agent_output')
         prompt = MIKE_REVIEW_PROMPT.format(agent_name=agent_name, agent_output=agent_output)
         if not remaining_agents:
             prompt += "\n没有剩余 Agent，可考虑 finish。"
@@ -72,6 +78,8 @@ class MikeAgent(BaseAgent):
         context: AgentContext,
         contributions: list[Tuple[str, str]],
     ) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='summarize_team')
         contributions_text = self._render_contributions(contributions)
         prompt = MIKE_SUMMARY_PROMPT.format(
             user_message=self._compose_user_message(context),

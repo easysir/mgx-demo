@@ -16,6 +16,14 @@ _STATE_DIR = Path(__file__).resolve().parents[3] / 'data' / 'sessions'
 _STATE_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _step_dir(session_id: str) -> Path:
+    return _STATE_DIR / f'{session_id}_steps'
+
+
+def _snapshot_dir(session_id: str) -> Path:
+    return _STATE_DIR / f'{session_id}_context_snapshots'
+
+
 @dataclass
 class SessionState:
     action_log: List[ActionLogEntry] = field(default_factory=list)
@@ -147,11 +155,81 @@ def hydrate_session_context(
     )
 
 
+def persist_action_detail(session_id: str, step_id: int, payload: Dict[str, Any]) -> str:
+    """将完整步骤详情持久化，返回文件路径，供后续索引。"""
+
+    directory = _step_dir(session_id)
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / f'step_{step_id}.json'
+    tmp_path = path.with_suffix('.tmp')
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    tmp_path.replace(path)
+    return str(path)
+
+
+def persist_session_context_snapshot(session_id: str, snapshot: SessionContext, step_id: int) -> str:
+    """持久化当前 SessionContext，以便后续复盘时直接查看指定步骤的上下文。"""
+
+    directory = _snapshot_dir(session_id)
+    directory.mkdir(parents=True, exist_ok=True)
+
+    def _serialize_action_entry(entry: ActionLogEntry) -> Dict[str, Any]:
+        return {
+            'agent': entry.agent,
+            'action': entry.action,
+            'result': entry.result,
+            'status': entry.status,
+            'timestamp': entry.timestamp,
+            'metadata': entry.metadata,
+        }
+
+    def _serialize_todo_entry(entry: TodoEntry) -> Dict[str, Any]:
+        return {
+            'description': entry.description,
+            'owner': entry.owner,
+            'priority': entry.priority,
+            'status': entry.status,
+            'timestamp': entry.timestamp,
+            'metadata': entry.metadata,
+        }
+
+    payload = {
+        'session_id': snapshot.session_id,
+        'owner_id': snapshot.owner_id,
+        'user_id': snapshot.user_id,
+        'user_messages': snapshot.user_message,
+        'most_recent_user_message': snapshot.most_recent_user_message,
+        'conversation_history': snapshot.conversation_history,
+        'artifacts': snapshot.artifacts,
+        'files_overview': snapshot.files_overview,
+        'action_log': [_serialize_action_entry(entry) for entry in snapshot.action_log],
+        'pending_todos': [_serialize_todo_entry(entry) for entry in snapshot.pending_todos],
+        'agent_specific': snapshot.agent_specific,
+    }
+    path = directory / f'step_{step_id}.json'
+    tmp_path = path.with_suffix('.tmp')
+    tmp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding='utf-8')
+    tmp_path.replace(path)
+    return str(path)
+
+
 def record_action(session_id: str, entry: ActionLogEntry) -> None:
     # 只保留最近 10 条关键动作，避免文件无限增长
     state = _load_state(session_id)
     state.action_log.append(entry)
     state.action_log = state.action_log[-10:]
+    _persist_state(session_id, state)
+
+
+def attach_snapshot_to_last_action(session_id: str, snapshot_path: str) -> None:
+    """为刚记录的 action_log 绑定上下文快照路径，方便后续 timeline 直接索引。"""
+    state = _load_state(session_id)
+    if not state.action_log:
+        return
+    entry = state.action_log[-1]
+    metadata = entry.metadata or {}
+    metadata['context_snapshot'] = snapshot_path
+    entry.metadata = metadata
     _persist_state(session_id, state)
 
 
@@ -193,7 +271,10 @@ __all__ = [
     'SessionState',
     'get_session_state',
     'hydrate_session_context',
+    'persist_action_detail',
+    'persist_session_context_snapshot',
     'record_action',
+    'attach_snapshot_to_last_action',
     'add_todo',
     'update_todo_status',
     'put_agent_data',

@@ -22,6 +22,8 @@ class AlexAgent(BaseAgent):
         return 'Alex 正在拆解开发任务与工具调用顺序。'
 
     async def act(self, context: AgentContext) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='act')
         prompt = ALEX_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         message_id = self._new_message_id()
         chunks: list[str] = []

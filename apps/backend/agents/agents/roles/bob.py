@@ -23,6 +23,8 @@ class BobAgent(BaseAgent):
         return 'Bob 正在评估架构与技术栈。'
 
     async def act(self, context: AgentContext) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='act')
         prompt = BOB_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         message_id = self._new_message_id()
         chunks: list[str] = []

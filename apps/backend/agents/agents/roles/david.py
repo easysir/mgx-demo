@@ -14,6 +14,8 @@ class DavidAgent(BaseAgent):
         return 'David 正在收集数据需求并设计可视化。'
 
     async def act(self, context: AgentContext) -> AgentRunResult:
+        # TODO: remove context logging once pipeline verified
+        self._format_context_for_log(context, stage='act')
         prompt = DAVID_SYSTEM_PROMPT.format(user_message=self._compose_user_message(context))
         return await self._stream_llm_response(
             context=context,

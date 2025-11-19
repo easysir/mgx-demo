@@ -20,5 +20,6 @@ dist/
 build/
 .cache/
 apps/backend/data
+apps/data
 .env
 .env.*
